@@ -1,0 +1,50 @@
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Build outputs
+dist/
+build/
+**/dist/
+**/build/
+frontend/.vite/
+
+# TypeScript
+*.tsbuildinfo
+
+# QLever index data (large binary files)
+qlever-data/
+*.index.*
+*.meta
+*.patterns
+*.lp
+
+# Docker
+docker/qlever/input/
+
+# Logs
+*.log
+logs/
+
+# Claude Code
+.claude/
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# SSL certificates (mount in production)
+docker/nginx/ssl/*.pem
+docker/nginx/ssl/*.key
+docker/nginx/ssl/*.crt

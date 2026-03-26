@@ -1,0 +1,18 @@
+# Aggregate coverage statistics grouped by schema
+PREFIX shexmap: <https://shexmap.example.org/ontology#>
+PREFIX dct:     <http://purl.org/dc/terms/>
+
+SELECT ?schema ?schemaTitle
+       (COUNT(DISTINCT ?shape) AS ?totalShapes)
+       (COUNT(DISTINCT ?map) AS ?mappingCount)
+WHERE {
+  ?schema a shexmap:ShExSchema .
+  OPTIONAL { ?schema dct:title ?schemaTitle }
+  OPTIONAL { ?shape shexmap:belongsToSchema ?schema }
+  OPTIONAL {
+    ?map a shexmap:ShExMap ;
+         shexmap:sourceSchema ?schema .
+  }
+}
+GROUP BY ?schema ?schemaTitle
+ORDER BY DESC(?mappingCount)

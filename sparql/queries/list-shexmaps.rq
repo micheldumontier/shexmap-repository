@@ -1,0 +1,29 @@
+# List ShExMaps with pagination and optional filters
+# Bind parameters before use:
+#   ?titleFilter  (FILTER clause, optional)
+#   ?limitVal     (integer)
+#   ?offsetVal    (integer)
+
+PREFIX shexmap: <https://shexmap.example.org/ontology#>
+PREFIX dct:     <http://purl.org/dc/terms/>
+PREFIX schema:  <https://schema.org/>
+PREFIX dcat:    <http://www.w3.org/ns/dcat#>
+
+SELECT ?id ?title ?description ?sourceSchema ?targetSchema
+       ?authorId ?authorName ?createdAt ?modifiedAt ?version ?stars
+WHERE {
+  ?id a shexmap:ShExMap ;
+      dct:title ?title ;
+      shexmap:sourceSchema ?sourceSchema ;
+      shexmap:targetSchema ?targetSchema ;
+      dct:creator ?authorId ;
+      dct:created ?createdAt ;
+      dct:modified ?modifiedAt ;
+      schema:version ?version .
+  OPTIONAL { ?id dct:description ?description }
+  OPTIONAL { ?authorId schema:name ?authorName }
+  OPTIONAL { ?id shexmap:stars ?stars }
+}
+ORDER BY DESC(?modifiedAt)
+LIMIT 20
+OFFSET 0

@@ -1,0 +1,16 @@
+# QLever settings file for the ShExMap repository index
+# See: https://github.com/ad-freiburg/qlever
+
+[index]
+name              = shexmap
+input-files       = /input/*.ttl
+index-basename    = /data/shexmap
+
+[server]
+port              = 7001
+num-threads       = 4
+cache-max-size    = 2G
+timeout           = 30s
+
+[runtime]
+log-level         = INFO

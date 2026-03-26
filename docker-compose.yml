@@ -1,0 +1,85 @@
+services:
+
+  # ─── Nginx reverse proxy + React SPA ──────────────────────────────────────
+  nginx:
+    build:
+      context: .
+      dockerfile: docker/nginx/Dockerfile
+    ports:
+      - "8080:80"
+    depends_on:
+      - api
+      - qlever
+    networks:
+      - shexmap-net
+    restart: unless-stopped
+
+  # ─── Node.js / Fastify API ─────────────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: docker/api/Dockerfile
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      QLEVER_SPARQL_URL: http://qlever:7001/sparql
+      QLEVER_UPDATE_URL: http://qlever:7001/update
+      SHEX_FILES_DIR: /shex-files
+    volumes:
+      - ./sparql/files:/shex-files:ro
+    depends_on:
+      qlever-init:
+        condition: service_completed_successfully
+    networks:
+      - shexmap-net
+    restart: unless-stopped
+
+  # ─── Volume permission fixer (runs once before qlever-init) ──────────────
+  qlever-perms:
+    image: alpine:latest
+    command: ["chmod", "777", "/data"]
+    volumes:
+      - qlever-data:/data
+    restart: "no"
+
+  # ─── QLever index initialiser (runs once, exits) ──────────────────────────
+  qlever-init:
+    image: adfreiburg/qlever:latest
+    entrypoint: ["/bin/sh", "/scripts/init-index.sh"]
+    volumes:
+      - qlever-data:/data          # persisted index files
+      - ./sparql:/sparql-data:ro   # seed + ontology Turtle files
+      - ./docker/qlever:/scripts:ro
+    working_dir: /data
+    depends_on:
+      qlever-perms:
+        condition: service_completed_successfully
+    networks:
+      - shexmap-net
+
+  # ─── QLever SPARQL server ──────────────────────────────────────────────────
+  qlever:
+    image: adfreiburg/qlever:latest
+    entrypoint: ["qlever", "start",
+      "--name", "shexmap",
+      "--description", "ShExMap Repository",
+      "--port", "7001",
+      "--system", "native",
+      "--run-in-foreground"
+    ]
+    volumes:
+      - qlever-data:/data          # index built by qlever-init
+    working_dir: /data
+    depends_on:
+      qlever-init:
+        condition: service_completed_successfully
+    networks:
+      - shexmap-net
+    restart: unless-stopped
+
+volumes:
+  qlever-data:
+
+networks:
+  shexmap-net:
+    driver: bridge
