@@ -4,7 +4,7 @@ export const PREFIXES = {
   shexrmap:    'https://shexmap.example.org/resource/map/',
   shexrschema: 'https://shexmap.example.org/resource/schema/',
   shexruser:   'https://shexmap.example.org/resource/user/',
-  shexrfile:   'https://shexmap.example.org/resource/file/',
+  shexrpair:   'https://shexmap.example.org/resource/pairing/',
   shex:        'http://www.w3.org/ns/shex#',
   dcat:    'http://www.w3.org/ns/dcat#',
   dct:     'http://purl.org/dc/terms/',

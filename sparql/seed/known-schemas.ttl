@@ -6,32 +6,12 @@
 
 # ─── Well-known ShEx schemas tracked for coverage ────────────────────────────
 
-shexrschema:fhir-r4 a shexmap:ShExSchema ;
-    dct:title "HL7 FHIR R4 ShEx" ;
-    dct:description "ShEx shapes for HL7 FHIR Release 4 resources." ;
-    dct:source <https://hl7.org/fhir/R4/> .
-
-shexrschema:wikidata a shexmap:ShExSchema ;
-    dct:title "Wikidata Entity Schemas" ;
-    dct:description "ShEx entity schemas maintained by the Wikidata community." ;
-    dct:source <https://www.wikidata.org/wiki/Wikidata:WikiProject_ShEx> .
-
-shexrschema:schema-org a shexmap:ShExSchema ;
-    dct:title "Schema.org ShEx" ;
-    dct:description "ShEx shapes for Schema.org types." ;
-    dct:source <https://schema.org/> .
-
-shexrschema:biolink a shexmap:ShExSchema ;
-    dct:title "Biolink Model ShEx" ;
-    dct:description "ShEx shapes for the Biolink Model, used in NCATS Translator." ;
-    dct:source <https://github.com/biolink/biolink-model> .
-
 shexrschema:bpfhir a shexmap:ShExSchema ;
-    dct:title "Blood Pressure FHIR RDF ShEx" ;
-    dct:description "ShEx shapes for blood pressure observations represented in FHIR RDF, with ShExMap annotations for bp: mapping variables." ;
+    dct:title "FHIR RDF ShEx" ;
+    dct:description "ShEx shapes FHIR RDF." ;
     dct:source <http://hl7.org/fhir-rdf/> .
 
 shexrschema:bpdam a shexmap:ShExSchema ;
-    dct:title "Blood Pressure DAM ShEx" ;
-    dct:description "ShEx shapes for blood pressure data in a simplified Data Access Model (DAM), with ShExMap annotations for bp: mapping variables." ;
+    dct:title "DAM ShEx" ;
+    dct:description "ShEx shapes for the Simplified Data Access Model (DAM)" ;
     dct:source <http://dam.example/med#> .

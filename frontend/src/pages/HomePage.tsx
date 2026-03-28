@@ -1,10 +1,10 @@
 import { Link } from 'react-router-dom';
-import { useShExMaps } from '../api/shexmaps.js';
-import { useCoverageOverview } from '../api/coverage.js';
+import { useShExMaps, useSchemas, useShExMapPairings } from '../api/shexmaps.js';
 
 export default function HomePage() {
   const { data: maps } = useShExMaps({ limit: 5, sort: 'modified' });
-  const { data: coverage } = useCoverageOverview();
+  const { data: schemas } = useSchemas();
+  const { data: pairings } = useShExMapPairings({ limit: 1 });
 
   return (
     <div className="space-y-14">
@@ -48,24 +48,24 @@ export default function HomePage() {
       </section>
 
       {/* Stats */}
-      {coverage && (
-        <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {[
-            { label: 'ShExMaps', value: coverage.totalShexMaps },
-            { label: 'Schemas', value: coverage.totalSchemas },
-            { label: 'Shapes Covered', value: `${coverage.totalMappedShapes}/${coverage.totalShapes}` },
-            { label: 'Overall Coverage', value: `${coverage.overallCoveragePercent}%` },
-          ].map(({ label, value }) => (
-            <div
-              key={label}
-              className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 text-center"
-            >
-              <div className="text-3xl font-bold text-violet-600">{value}</div>
-              <div className="text-sm text-slate-500 mt-1 font-medium">{label}</div>
+      <section className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {[
+          { label: 'Schemas', value: schemas?.length, tab: 'schemas' },
+          { label: 'ShExMap Files', value: maps?.total, tab: 'shexmaps' },
+          { label: 'Pairings', value: pairings?.total, tab: 'pairings' },
+        ].map(({ label, value, tab }) => (
+          <Link
+            key={label}
+            to={`/browse?tab=${tab}`}
+            className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 text-center hover:border-violet-300 hover:shadow-md transition-all group"
+          >
+            <div className="text-3xl font-bold text-violet-600 group-hover:text-violet-700">
+              {value ?? '—'}
             </div>
-          ))}
-        </section>
-      )}
+            <div className="text-sm text-slate-500 mt-1 font-medium">{label}</div>
+          </Link>
+        ))}
+      </section>
 
       {/* Recent maps */}
       <section>

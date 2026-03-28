@@ -16,8 +16,12 @@
 # ─── Classes ──────────────────────────────────────────────────────────────────
 
 shexmap:ShExMap a owl:Class ;
-    rdfs:label "ShExMap" ;
-    rdfs:comment "A mapping between two ShEx schemas, described by ShExMap syntax." .
+    rdfs:label "ShEx Map" ;
+    rdfs:comment "An individual ShEx schema file that contains ShExMap annotations (%%Map:{ variable %} expressions). Can participate in one or more pairings." .
+
+shexmap:ShExMapPairing a owl:Class ;
+    rdfs:label "ShExMap Pairing" ;
+    rdfs:comment "A declared pairing of a source ShExMap and a target ShExMap that share map variables, enabling bidirectional RDF transformation." .
 
 shexmap:ShExMapVersion a owl:Class ;
     rdfs:label "ShExMap Version" ;
@@ -27,75 +31,64 @@ shexmap:ShExSchema a owl:Class ;
     rdfs:label "ShEx Schema" ;
     rdfs:comment "A ShEx schema defining a set of shapes for validating RDF data." .
 
-shexmap:ShExFile a owl:Class ;
-    rdfs:label "ShEx File" ;
-    rdfs:comment "A ShEx file that is part of a ShExMap, representing one side of a mapping." .
-
 shexmap:CoverageReport a owl:Class ;
     rdfs:label "Coverage Report" ;
     rdfs:comment "Computed statistics on how many shapes in a schema have ShExMap coverage." .
 
 # ─── ShExMap properties ───────────────────────────────────────────────────────
 
-shexmap:mappingContent a owl:DatatypeProperty ;
-    rdfs:label "mapping content" ;
-    rdfs:comment "Raw ShExMap source text for single-document ShExMap formats." ;
-    rdfs:domain shexmap:ShExMap ;
-    rdfs:range xsd:string .
-
-shexmap:hasSourceFile a owl:ObjectProperty ;
-    rdfs:label "has source file" ;
-    rdfs:comment "A ShEx file on the source side of this mapping. A ShExMap may have one or more source files." ;
-    rdfs:domain shexmap:ShExMap ;
-    rdfs:range shexmap:ShExFile .
-
-shexmap:hasTargetFile a owl:ObjectProperty ;
-    rdfs:label "has target file" ;
-    rdfs:comment "A ShEx file on the target side of this mapping. A ShExMap may have one or more target files." ;
-    rdfs:domain shexmap:ShExMap ;
-    rdfs:range shexmap:ShExFile .
-
-shexmap:sourceSchema a owl:ObjectProperty ;
-    rdfs:label "source schema" ;
-    rdfs:comment "The ShEx schema being mapped from." ;
-    rdfs:domain shexmap:ShExMap ;
-    rdfs:range shexmap:ShExSchema .
-
-shexmap:targetSchema a owl:ObjectProperty ;
-    rdfs:label "target schema" ;
-    rdfs:comment "The ShEx schema being mapped to." ;
-    rdfs:domain shexmap:ShExMap ;
-    rdfs:range shexmap:ShExSchema .
-
-shexmap:hasVersion a owl:ObjectProperty ;
-    rdfs:label "has version" ;
-    rdfs:domain shexmap:ShExMap ;
-    rdfs:range shexmap:ShExMapVersion .
-
-shexmap:currentVersion a owl:ObjectProperty ;
-    rdfs:label "current version" ;
-    rdfs:domain shexmap:ShExMap ;
-    rdfs:range shexmap:ShExMapVersion .
-
-shexmap:stars a owl:DatatypeProperty ;
-    rdfs:label "stars" ;
-    rdfs:comment "Number of times this ShExMap has been starred by users." ;
-    rdfs:domain shexmap:ShExMap ;
-    rdfs:range xsd:integer .
-
-# ─── ShExFile properties ──────────────────────────────────────────────────────
-
 shexmap:fileName a owl:DatatypeProperty ;
     rdfs:label "file name" ;
-    rdfs:comment "The original filename of the ShEx file, e.g. bpfhir.shex." ;
-    rdfs:domain shexmap:ShExFile ;
+    rdfs:comment "The filename of the ShEx file, e.g. bpfhir.shex." ;
+    rdfs:domain shexmap:ShExMap ;
     rdfs:range xsd:string .
 
 shexmap:fileFormat a owl:DatatypeProperty ;
     rdfs:label "file format" ;
-    rdfs:comment "The ShEx serialisation format: shexc (default), shexj." ;
-    rdfs:domain shexmap:ShExFile ;
+    rdfs:comment "The ShEx serialisation format: shexc (default) or shexj." ;
+    rdfs:domain shexmap:ShExMap ;
     rdfs:range xsd:string .
+
+shexmap:mappingContent a owl:DatatypeProperty ;
+    rdfs:label "mapping content" ;
+    rdfs:comment "Inline ShExMap source text, used when the map is stored directly in the triplestore rather than as a linked file." ;
+    rdfs:domain shexmap:ShExMap ;
+    rdfs:range xsd:string .
+
+shexmap:hasSchema a owl:ObjectProperty ;
+    rdfs:label "has schema" ;
+    rdfs:comment "Links a ShExMap to the ShEx schema whose shapes it annotates." ;
+    rdfs:domain shexmap:ShExMap ;
+    rdfs:range shexmap:ShExSchema .
+
+shexmap:stars a owl:DatatypeProperty ;
+    rdfs:label "stars" ;
+    rdfs:comment "Number of times this resource has been starred by users." ;
+    rdfs:range xsd:integer .
+
+# ─── ShExMapPairing properties ────────────────────────────────────────────────
+
+shexmap:sourceMap a owl:ObjectProperty ;
+    rdfs:label "source map" ;
+    rdfs:comment "The ShExMap on the source side of this pairing." ;
+    rdfs:domain shexmap:ShExMapPairing ;
+    rdfs:range shexmap:ShExMap .
+
+shexmap:targetMap a owl:ObjectProperty ;
+    rdfs:label "target map" ;
+    rdfs:comment "The ShExMap on the target side of this pairing." ;
+    rdfs:domain shexmap:ShExMapPairing ;
+    rdfs:range shexmap:ShExMap .
+
+shexmap:hasVersion a owl:ObjectProperty ;
+    rdfs:label "has version" ;
+    rdfs:domain shexmap:ShExMapPairing ;
+    rdfs:range shexmap:ShExMapVersion .
+
+shexmap:currentVersion a owl:ObjectProperty ;
+    rdfs:label "current version" ;
+    rdfs:domain shexmap:ShExMapPairing ;
+    rdfs:range shexmap:ShExMapVersion .
 
 # ─── ShExSchema properties ────────────────────────────────────────────────────
 
