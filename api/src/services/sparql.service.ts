@@ -41,9 +41,10 @@ export async function sparqlUpdate(
   update: string
 ): Promise<void> {
   const fullUpdate = `${sparqlPrefixes()}\n${update}`;
-  const res = await fastify.sparql.store.update(fullUpdate);
+  const client = fastify.sparql;
 
-  // SimpleClient's store.update returns a Response
+  const res = await client.postUrlencoded(fullUpdate, { update: true });
+
   if (res && typeof (res as Response).ok !== 'undefined' && !(res as Response).ok) {
     const body = await (res as Response).text();
     throw new Error(`SPARQL UPDATE failed (${(res as Response).status}): ${body}`);
