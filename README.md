@@ -36,15 +36,26 @@ Open [http://localhost](http://localhost).
 
 ## Development
 
+QLever must be running locally before starting the API or frontend. Start it with Docker Compose (detached), then run the API and frontend dev servers:
+
 ```bash
-# API with hot reload
+# 1. Start QLever in the background (only needed once)
+docker compose up qlever-perms qlever-init qlever -d
+
+# 2. Set up the .env and symlink it for the API
+cp .env.example .env        # uses localhost:7001 for QLever
+ln -s ../.env api/.env
+
+# 3. API with hot reload
 cd api && npm install && npm run dev
 
-# Frontend dev server (with HMR)
+# 4. Frontend dev server (with HMR) — in a separate terminal
 cd frontend && npm install && npm run dev
 ```
 
-The Vite dev server proxies `/api` and `/sparql` to `localhost:3000` and `localhost:7001` respectively.
+Open [http://localhost:5173](http://localhost:5173).
+
+The Vite dev server proxies `/api` → `localhost:3000` and `/sparql` → `localhost:7001`.
 
 ## Configuration
 
@@ -53,7 +64,7 @@ All configuration is via environment variables. Copy `.env.example` to `.env`.
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `AUTH_ENABLED` | `false` | Enable OAuth2/OIDC authentication |
-| `QLEVER_SPARQL_URL` | `http://qlever:7001/sparql` | QLever SPARQL endpoint |
+| `QLEVER_SPARQL_URL` | `http://localhost:7001/sparql` | QLever SPARQL endpoint |
 | `JWT_SECRET` | *(change this)* | Secret for signing JWTs |
 
 ## Contributing
