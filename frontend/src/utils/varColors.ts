@@ -16,9 +16,13 @@ export function injectVarColors() {
   if (colorsInjected) return;
   colorsInjected = true;
   const style = document.createElement('style');
-  style.textContent = VAR_COLOR_PALETTE.map((c, i) =>
+  // Legacy per-index palette classes (kept for any existing callers)
+  const paletteRules = VAR_COLOR_PALETTE.map((c, i) =>
     `.shex-var-${i} { background: ${c.bg} !important; border-bottom: 2px solid ${c.border}; border-radius: 2px; }`
   ).join('\n');
+  // Single purple class for matched variables in the editor
+  const matchedRule = `.shex-var-matched { background: rgba(139,92,246,0.25) !important; border-bottom: 2px solid #7c3aed; border-radius: 2px; }`;
+  style.textContent = paletteRules + '\n' + matchedRule;
   document.head.appendChild(style);
 }
 

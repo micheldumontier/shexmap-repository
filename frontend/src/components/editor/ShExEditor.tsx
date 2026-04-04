@@ -7,11 +7,11 @@
  *  - Download current content as a file
  */
 
-import { useRef, useEffect, useCallback, useState } from 'react';
+import { useRef, useEffect, useCallback, useState, useMemo } from 'react';
 import Editor, { useMonaco } from '@monaco-editor/react';
 import type * as MonacoType from 'monaco-editor';
 import { registerShexLanguage, SHEXC_LANGUAGE_ID } from '../../utils/shexLanguage.js';
-import { VAR_COLOR_PALETTE, injectVarColors } from '../../utils/varColors.js';
+import { injectVarColors, extractVars } from '../../utils/varColors.js';
 
 // ─── Local version store ──────────────────────────────────────────────────────
 
@@ -142,20 +142,21 @@ export default function ShExEditor({
     }
   }, [monaco]);
 
-  // Apply variable colour decorations
+  // Apply purple highlight decorations for matched variables
   const applyDecorations = useCallback(() => {
     const editor = editorRef.current;
-    if (!editor || !varColorMap || varColorMap.size === 0) return;
+    if (!editor) return;
     injectVarColors();
     decorationsRef.current?.clear();
+    if (!varColorMap || varColorMap.size === 0) return;
     const model = editor.getModel();
     if (!model) return;
     const newDecos: MonacoType.editor.IModelDeltaDecoration[] = [];
-    for (const [varName, colorIdx] of varColorMap) {
+    for (const [varName] of varColorMap) {
       for (const match of model.findMatches(varName, true, false, true, null, true)) {
         newDecos.push({
           range: match.range,
-          options: { inlineClassName: `shex-var-${colorIdx}` },
+          options: { inlineClassName: 'shex-var-matched' },
         });
       }
     }
@@ -316,23 +317,8 @@ export default function ShExEditor({
         )}
       </div>
 
-      {/* Variable colour legend (if decorations active) */}
-      {varColorMap && varColorMap.size > 0 && (
-        <div className="flex flex-wrap gap-1.5 px-3 py-1.5 bg-slate-900 border-t border-slate-700">
-          {[...varColorMap.entries()].map(([varName, colorIdx]) => (
-            <span
-              key={varName}
-              className="text-xs font-mono px-1.5 py-0.5 rounded"
-              style={{
-                background: VAR_COLOR_PALETTE[colorIdx]!.bg,
-                borderBottom: `2px solid ${VAR_COLOR_PALETTE[colorIdx]!.border}`,
-              }}
-            >
-              {varName}
-            </span>
-          ))}
-        </div>
-      )}
+      {/* Variable legend — all vars extracted from this content */}
+      <VariableLegend localContent={localContent} varColorMap={varColorMap} />
 
       {/* Version history panel */}
       {showVersionHistory && (
@@ -455,6 +441,46 @@ export default function ShExEditor({
           }
         }}
       />
+    </div>
+  );
+}
+
+// ─── Variable legend ──────────────────────────────────────────────────────────
+
+function VariableLegend({
+  localContent,
+  varColorMap,
+}: {
+  localContent: string;
+  varColorMap?: Map<string, number>;
+}) {
+  const allVars = useMemo(() => extractVars(localContent), [localContent]);
+  if (allVars.length === 0) return null;
+
+  return (
+    <div className="flex flex-wrap gap-1.5 px-3 py-1.5 bg-slate-900 border-t border-slate-700">
+      {allVars.map((varName) => {
+        const matched = varColorMap?.has(varName) ?? false;
+        return matched ? (
+          <span
+            key={varName}
+            title="Matched in paired schema"
+            className="text-xs font-mono px-1.5 py-0.5 rounded text-violet-200"
+            style={{ background: 'rgba(139,92,246,0.25)', borderBottom: '2px solid #7c3aed' }}
+          >
+            {varName}
+          </span>
+        ) : (
+          <span
+            key={varName}
+            title="Not matched in paired schema"
+            className="text-xs font-mono px-1.5 py-0.5 rounded text-slate-500"
+            style={{ background: 'rgba(100,116,139,0.15)', borderBottom: '2px solid #475569' }}
+          >
+            {varName}
+          </span>
+        );
+      })}
     </div>
   );
 }

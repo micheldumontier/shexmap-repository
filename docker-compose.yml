@@ -47,10 +47,16 @@ services:
   qlever-init:
     image: adfreiburg/qlever:latest
     entrypoint: ["/bin/sh", "/scripts/init-index.sh"]
+    environment:
+      # Optional: set to a path inside the container to restore from a backup.
+      # Example: RESTORE_FROM=/backups/2024-01-01T12-00-00.ttl
+      # The sparql/backup/ host directory is mounted at /backups below.
+      RESTORE_FROM: ${RESTORE_FROM:-}
     volumes:
       - qlever-data:/data          # persisted index files
       - ./sparql:/sparql-data:ro   # seed + ontology Turtle files
       - ./docker/qlever:/scripts:ro
+      - ./sparql/backup:/backups:ro  # backup files available to restore from
     working_dir: /data
     depends_on:
       qlever-perms:

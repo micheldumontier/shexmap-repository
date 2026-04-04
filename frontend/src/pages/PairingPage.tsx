@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useShExMapPairing, type ShExMap } from '../api/shexmaps.js';
 import { apiClient } from '../api/client.js';
 import ShExEditor from '../components/editor/ShExEditor.js';
-import { VAR_COLOR_PALETTE, buildVarColorMap } from '../utils/varColors.js';
+import { buildVarColorMap } from '../utils/varColors.js';
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
@@ -83,29 +83,6 @@ export default function PairingPage() {
           </div>
         )}
       </div>
-
-      {/* Shared variable legend (top-level; also shown inline per-editor) */}
-      {varColorMap.size > 0 && (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-5 py-3">
-          <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">
-            Shared mapping variables
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {[...varColorMap.entries()].map(([varName, colorIdx]) => (
-              <span
-                key={varName}
-                className="text-xs font-mono px-2 py-0.5 rounded"
-                style={{
-                  background: VAR_COLOR_PALETTE[colorIdx]!.bg,
-                  borderBottom: `2px solid ${VAR_COLOR_PALETTE[colorIdx]!.border}`,
-                }}
-              >
-                {varName}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* ShEx file panels */}
       <div className="flex flex-col gap-5">

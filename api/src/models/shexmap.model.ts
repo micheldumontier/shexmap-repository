@@ -79,6 +79,30 @@ export interface ShExMapVersionWithContent extends ShExMapVersion {
   content: string;
 }
 
+// ─── ShExMap Pairing Version ──────────────────────────────────────────────────
+
+export const SavePairingVersionSchema = z.object({
+  commitMessage: z.string().max(500).optional(),
+  sourceMapVersionNumber: z.coerce.number().int().min(1).optional(),
+  targetMapVersionNumber: z.coerce.number().int().min(1).optional(),
+});
+
+export type SavePairingVersion = z.infer<typeof SavePairingVersionSchema>;
+
+export interface ShExMapPairingVersion {
+  id: string;              // "{pairingId}-v{n}"
+  pairingId: string;
+  versionNumber: number;
+  commitMessage?: string;
+  sourceMapId: string;
+  sourceVersionNumber?: number;
+  targetMapId: string;
+  targetVersionNumber?: number;
+  authorId: string;
+  authorName: string;
+  createdAt: string;
+}
+
 // ─── ShExMap Pairing ──────────────────────────────────────────────────────────
 
 export const ShExMapPairingCreateSchema = z.object({

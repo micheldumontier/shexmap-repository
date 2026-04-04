@@ -241,7 +241,7 @@ export async function listShExMapPairings(
   const orderBy = `ORDER BY ${query.order === 'desc' ? 'DESC' : 'ASC'}(?${sortVar})`;
 
   const sparql = `
-    SELECT ?id ?title ?description
+    SELECT ?id ?title ?description ?license
            ?authorId ?authorName ?createdAt ?modifiedAt ?version ?stars
            ?srcId ?srcTitle ?srcFileName ?srcFileFormat ?srcSourceUrl ?srcSchemaUrl
            ?tgtId ?tgtTitle ?tgtFileName ?tgtFileFormat ?tgtSourceUrl ?tgtSchemaUrl
@@ -255,6 +255,7 @@ export async function listShExMapPairings(
           dct:modified ?modifiedAt ;
           schema:version ?version .
       OPTIONAL { ?id dct:description ?description }
+      OPTIONAL { ?id dct:license ?license }
       OPTIONAL { ?authorId schema:name ?authorName }
       OPTIONAL { ?id <${SM}stars> ?stars }
       OPTIONAL { ?srcId dct:title ?srcTitle }
@@ -282,6 +283,7 @@ export async function listShExMapPairings(
     sourceMap: rowToShExMap(r, 'src'),
     targetMap: rowToShExMap(r, 'tgt'),
     tags: [],
+    license: r['license']?.value,
     version: r['version']?.value ?? '1.0.0',
     authorId: extractLocalId(r['authorId']?.value ?? ''),
     authorName: r['authorName']?.value ?? 'Unknown',
@@ -300,7 +302,7 @@ export async function getShExMapPairing(
   const iri = `${RP}${id}`;
 
   const sparql = `
-    SELECT ?title ?description ?version ?stars ?tag
+    SELECT ?title ?description ?version ?license ?stars ?tag
            ?authorId ?authorName ?createdAt ?modifiedAt
            ?srcId ?srcTitle ?srcDesc ?srcContent ?srcFileName ?srcFileFormat ?srcSourceUrl ?srcSchemaUrl
            ?tgtId ?tgtTitle ?tgtDesc ?tgtContent ?tgtFileName ?tgtFileFormat ?tgtSourceUrl ?tgtSchemaUrl
@@ -314,6 +316,7 @@ export async function getShExMapPairing(
           dct:modified ?modifiedAt ;
           schema:version ?version .
       OPTIONAL { <${iri}> dct:description ?description }
+      OPTIONAL { <${iri}> dct:license ?license }
       OPTIONAL { ?authorId schema:name ?authorName }
       OPTIONAL { <${iri}> <${SM}stars> ?stars }
       OPTIONAL { <${iri}> dcat:keyword ?tag }
@@ -379,6 +382,7 @@ export async function getShExMapPairing(
       stars: 0,
     },
     tags,
+    license: r['license']?.value,
     version: r['version']?.value ?? '1.0.0',
     authorId: extractLocalId(r['authorId']?.value ?? ''),
     authorName: r['authorName']?.value ?? 'Unknown',

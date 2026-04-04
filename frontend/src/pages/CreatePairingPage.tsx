@@ -24,12 +24,15 @@ import {
   useShExMapPairing,
   useCreateShExMapPairing,
   useUpdateShExMapPairing,
+  useShExMapPairingVersions,
+  useSaveShExMapPairingVersion,
   type ShExMap,
   type ShExMapVersion,
+  type ShExMapPairingVersion,
 } from '../api/shexmaps.js';
 import { apiClient } from '../api/client.js';
 import ShExEditor from '../components/editor/ShExEditor.js';
-import { VAR_COLOR_PALETTE, extractVars, buildVarColorMap } from '../utils/varColors.js';
+import { extractVars, buildVarColorMap } from '../utils/varColors.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -100,6 +103,124 @@ function saveTurtle(mapId: string, content: string) {
     all[mapId] = content;
     localStorage.setItem(TURTLE_STORAGE_KEY, JSON.stringify(all));
   } catch { /* quota exceeded — ignore */ }
+}
+
+// ─── License list ─────────────────────────────────────────────────────────────
+
+const KNOWN_LICENSES = [
+  { label: 'CC0 1.0 — Public Domain Dedication',            url: 'https://creativecommons.org/publicdomain/zero/1.0/' },
+  { label: 'CC BY 4.0 — Attribution',                       url: 'https://creativecommons.org/licenses/by/4.0/' },
+  { label: 'CC BY-SA 4.0 — Attribution-ShareAlike',         url: 'https://creativecommons.org/licenses/by-sa/4.0/' },
+  { label: 'CC BY-NC 4.0 — Attribution-NonCommercial',      url: 'https://creativecommons.org/licenses/by-nc/4.0/' },
+  { label: 'CC BY-NC-SA 4.0 — Attribution-NonCommercial-ShareAlike', url: 'https://creativecommons.org/licenses/by-nc-sa/4.0/' },
+  { label: 'CC BY-ND 4.0 — Attribution-NoDerivatives',      url: 'https://creativecommons.org/licenses/by-nd/4.0/' },
+  { label: 'ODbL 1.0 — Open Database License',              url: 'https://opendatacommons.org/licenses/odbl/1-0/' },
+  { label: 'ODC-By 1.0 — Open Data Commons Attribution',    url: 'https://opendatacommons.org/licenses/by/1-0/' },
+  { label: 'PDDL 1.0 — Public Domain Dedication & License', url: 'https://opendatacommons.org/licenses/pddl/1-0/' },
+  { label: 'MIT License',                                   url: 'https://opensource.org/licenses/MIT' },
+  { label: 'Apache 2.0',                                    url: 'https://www.apache.org/licenses/LICENSE-2.0' },
+  { label: 'GPL 3.0',                                       url: 'https://www.gnu.org/licenses/gpl-3.0.html' },
+];
+
+function LicensePicker({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (url: string) => void;
+}) {
+  const [q, setQ] = useState('');
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  const filtered = q.trim()
+    ? KNOWN_LICENSES.filter((l) =>
+        l.label.toLowerCase().includes(q.toLowerCase()) ||
+        l.url.toLowerCase().includes(q.toLowerCase()),
+      )
+    : KNOWN_LICENSES;
+
+  const selectedLabel = KNOWN_LICENSES.find((l) => l.url === value)?.label;
+
+  // Close on outside click
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  return (
+    <div ref={ref} className="relative">
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={open ? q : (selectedLabel ?? value)}
+          onFocus={() => { setOpen(true); setQ(''); }}
+          onChange={(e) => { setQ(e.target.value); setOpen(true); }}
+          placeholder="Search or paste a license URL…"
+          className="flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 focus:border-violet-400 focus:outline-none focus:ring-1 focus:ring-violet-300"
+        />
+        {value && (
+          <button
+            type="button"
+            onClick={() => { onChange(''); setQ(''); }}
+            className="text-xs text-slate-400 hover:text-slate-600 px-2"
+            title="Clear"
+          >
+            ✕
+          </button>
+        )}
+      </div>
+
+      {/* Selected URL display */}
+      {value && !open && (
+        <p className="mt-1 text-xs font-mono text-slate-400 truncate">{value}</p>
+      )}
+
+      {/* Dropdown */}
+      {open && (
+        <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
+          {filtered.length === 0 ? (
+            <div className="px-3 py-2 text-xs text-slate-400 italic">No matches — paste a custom URL above</div>
+          ) : (
+            filtered.map((l) => (
+              <button
+                key={l.url}
+                type="button"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  onChange(l.url);
+                  setOpen(false);
+                  setQ('');
+                }}
+                className={`w-full text-left px-3 py-2 text-sm hover:bg-violet-50 hover:text-violet-700 transition-colors ${value === l.url ? 'bg-violet-50 text-violet-700 font-medium' : 'text-slate-700'}`}
+              >
+                <span className="block">{l.label}</span>
+                <span className="block text-xs font-mono text-slate-400 truncate">{l.url}</span>
+              </button>
+            ))
+          )}
+          {/* Allow pasting a custom URL not in the list */}
+          {q && !filtered.find((l) => l.url === q) && q.startsWith('http') && (
+            <button
+              type="button"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                onChange(q);
+                setOpen(false);
+                setQ('');
+              }}
+              className="w-full text-left px-3 py-2 text-sm text-violet-600 hover:bg-violet-50 border-t border-slate-100"
+            >
+              Use custom URL: <span className="font-mono">{q}</span>
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ─── Subcomponents ────────────────────────────────────────────────────────────
@@ -313,24 +434,26 @@ function VariableLegend({
         Mapping variables
       </div>
       <div className="flex flex-wrap gap-2 items-center">
-        {shared.map(([varName, colorIdx]) => (
+        {shared.map(([varName]) => (
           <span
             key={varName}
-            className="text-xs font-mono px-2 py-0.5 rounded"
-            title="Shared between source and target"
-            style={{ background: VAR_COLOR_PALETTE[colorIdx]!.bg, borderBottom: `2px solid ${VAR_COLOR_PALETTE[colorIdx]!.border}` }}
+            className="text-xs font-mono px-2 py-0.5 rounded text-violet-900"
+            title="Matched between source and target"
+            style={{ background: 'rgba(139,92,246,0.15)', borderBottom: '2px solid #7c3aed' }}
           >
             {varName}
           </span>
         ))}
         {srcOnly.map((v) => (
-          <span key={`src-${v}`} className="text-xs font-mono px-2 py-0.5 rounded bg-slate-100 text-slate-400 border-b-2 border-slate-300" title="Source only — no match in target">
-            {v} <span className="text-slate-300">(src)</span>
+          <span key={`src-${v}`} className="text-xs font-mono px-2 py-0.5 rounded text-slate-500" title="Source only — no match in target"
+            style={{ background: 'rgba(100,116,139,0.15)', borderBottom: '2px solid #475569' }}>
+            {v} <span className="text-slate-400">(src)</span>
           </span>
         ))}
         {tgtOnly.map((v) => (
-          <span key={`tgt-${v}`} className="text-xs font-mono px-2 py-0.5 rounded bg-slate-100 text-slate-400 border-b-2 border-slate-300" title="Target only — no match in source">
-            {v} <span className="text-slate-300">(tgt)</span>
+          <span key={`tgt-${v}`} className="text-xs font-mono px-2 py-0.5 rounded text-slate-500" title="Target only — no match in source"
+            style={{ background: 'rgba(100,116,139,0.15)', borderBottom: '2px solid #475569' }}>
+            {v} <span className="text-slate-400">(tgt)</span>
           </span>
         ))}
       </div>
@@ -339,6 +462,31 @@ function VariableLegend({
           Greyed variables appear in only one side — check spelling or add them to the other schema.
         </p>
       )}
+    </div>
+  );
+}
+
+/** Pairing version history table */
+function PairingVersionHistory({ versions }: { versions: ShExMapPairingVersion[] }) {
+  return (
+    <div className="bg-slate-50 rounded-lg border border-slate-200 px-4 py-3 space-y-1.5 max-h-56 overflow-y-auto">
+      <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Pairing version history</div>
+      {[...versions].reverse().map((v) => (
+        <div key={v.id} className="flex items-center gap-3 text-xs">
+          <span className="font-mono text-violet-700 shrink-0">v{v.versionNumber}</span>
+          <span className="text-slate-500 truncate flex-1">
+            {v.commitMessage ?? <span className="italic text-slate-400">no message</span>}
+          </span>
+          {v.sourceVersionNumber !== undefined && (
+            <span className="text-slate-400 shrink-0 font-mono">src@v{v.sourceVersionNumber}</span>
+          )}
+          {v.targetVersionNumber !== undefined && (
+            <span className="text-slate-400 shrink-0 font-mono">tgt@v{v.targetVersionNumber}</span>
+          )}
+          <span className="text-slate-400 shrink-0">{new Date(v.createdAt).toLocaleDateString()}</span>
+          <span className="text-slate-400 shrink-0">by {v.authorName}</span>
+        </div>
+      ))}
     </div>
   );
 }
@@ -621,10 +769,19 @@ export default function CreatePairingPage() {
   const [saveFlash, setSaveFlash]     = useState(false);
   const [savedPairingId, setSavedPairingId] = useState('');
 
-  // Populate from existing pairing when loaded
+  // Pairing version history
+  const pairingVersionsQuery = useShExMapPairingVersions(editPairingId);
+  const savePairingVersion   = useSaveShExMapPairingVersion(editPairingId);
+  const [showPairingHistory, setShowPairingHistory] = useState(false);
+  const [pvCommitMsg, setPvCommitMsg] = useState('');
+  const [pvSaveFlash, setPvSaveFlash] = useState(false);
+
+  // Populate from existing pairing — only once on initial load, not after saves
+  const pairingPopulated = useRef(false);
   useEffect(() => {
     const p = pairingQuery.data;
-    if (!p) return;
+    if (!p || pairingPopulated.current) return;
+    pairingPopulated.current = true;
     setPairingTitle(p.title);
     setPairingDesc(p.description ?? '');
     setPairingTags(p.tags.join(', '));
@@ -635,6 +792,11 @@ export default function CreatePairingPage() {
     if (p.sourceMap.content) setSrcShex(p.sourceMap.content);
     if (p.targetMap.content) setTgtShex(p.targetMap.content);
   }, [pairingQuery.data]);
+
+  // Reset the populated flag when the pairing id changes (user selects a different pairing)
+  useEffect(() => {
+    pairingPopulated.current = false;
+  }, [editPairingId]);
 
   // Shared variable colour map (matched vars only)
   const varColorMap = useMemo<Map<string, number>>(() => {
@@ -866,10 +1028,8 @@ export default function CreatePairingPage() {
               className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 focus:border-violet-400 focus:outline-none focus:ring-1 focus:ring-violet-300" />
           </div>
           <div className="sm:col-span-2">
-            <label className="text-xs text-slate-500 font-medium block mb-1">License URL</label>
-            <input value={pairingLicense} onChange={(e) => setPairingLicense(e.target.value)}
-              placeholder="https://creativecommons.org/licenses/by/4.0/"
-              className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 font-mono focus:border-violet-400 focus:outline-none focus:ring-1 focus:ring-violet-300" />
+            <label className="text-xs text-slate-500 font-medium block mb-1">License</label>
+            <LicensePicker value={pairingLicense} onChange={setPairingLicense} />
           </div>
         </div>
 
@@ -898,7 +1058,7 @@ export default function CreatePairingPage() {
           </div>
         )}
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <button
             onClick={handleSavePairing}
             disabled={isSavingPairing || !pairingTitle || !srcMapId || !tgtMapId}
@@ -909,10 +1069,54 @@ export default function CreatePairingPage() {
           >
             {isSavingPairing ? 'Saving…' : saveFlash ? 'Saved!' : editPairingId ? 'Update Pairing' : 'Save Pairing'}
           </button>
+
+          {/* Pairing version save — only shown when editing an existing pairing */}
+          {editPairingId && (
+            <>
+              <input
+                type="text"
+                value={pvCommitMsg}
+                onChange={(e) => setPvCommitMsg(e.target.value)}
+                placeholder="version note (optional)"
+                className="text-sm border border-slate-200 bg-slate-50 rounded-lg px-3 py-2 w-52 focus:border-violet-400 focus:outline-none focus:ring-1 focus:ring-violet-300"
+              />
+              <button
+                onClick={async () => {
+                  await savePairingVersion.mutateAsync({ commitMessage: pvCommitMsg.trim() || undefined });
+                  setPvCommitMsg('');
+                  setPvSaveFlash(true);
+                  setTimeout(() => setPvSaveFlash(false), 1500);
+                }}
+                disabled={savePairingVersion.isPending}
+                className={`text-sm font-medium px-4 py-2 rounded-lg transition-colors ${
+                  pvSaveFlash ? 'bg-green-600 text-white' :
+                  'bg-slate-700 hover:bg-slate-600 text-slate-200 disabled:opacity-50'
+                }`}
+              >
+                {savePairingVersion.isPending ? 'Saving…' : pvSaveFlash ? 'Saved!' : '↑ Save version'}
+              </button>
+              {(pairingVersionsQuery.data?.length ?? 0) > 0 && (
+                <button
+                  onClick={() => setShowPairingHistory((s) => !s)}
+                  className="text-sm px-3 py-2 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors"
+                >
+                  History ({pairingVersionsQuery.data!.length})
+                </button>
+              )}
+            </>
+          )}
+
           {(!pairingTitle || !srcMapId || !tgtMapId) && (
             <span className="text-xs text-slate-400 italic">Title and both maps are required.</span>
           )}
         </div>
+
+        {/* Pairing version history panel */}
+        {showPairingHistory && editPairingId && (
+          <PairingVersionHistory
+            versions={pairingVersionsQuery.data ?? []}
+          />
+        )}
       </section>
     </div>
   );

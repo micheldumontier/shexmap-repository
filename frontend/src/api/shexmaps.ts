@@ -218,6 +218,45 @@ export function useCreateShExMapPairing() {
   });
 }
 
+// ─── ShExMap Pairing Versions ─────────────────────────────────────────────────
+
+export interface ShExMapPairingVersion {
+  id: string;
+  pairingId: string;
+  versionNumber: number;
+  commitMessage?: string;
+  sourceMapId: string;
+  sourceVersionNumber?: number;
+  targetMapId: string;
+  targetVersionNumber?: number;
+  authorId: string;
+  authorName: string;
+  createdAt: string;
+}
+
+export function useShExMapPairingVersions(pairingId: string) {
+  return useQuery<ShExMapPairingVersion[]>({
+    queryKey: ['pairing-versions', pairingId],
+    queryFn: () => apiClient.get(`/pairings/${pairingId}/versions`).then((r) => r.data),
+    enabled: !!pairingId,
+  });
+}
+
+export function useSaveShExMapPairingVersion(pairingId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: {
+      commitMessage?: string;
+      sourceMapVersionNumber?: number;
+      targetMapVersionNumber?: number;
+    }) => apiClient.post(`/pairings/${pairingId}/versions`, data).then((r) => r.data as ShExMapPairingVersion),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['pairing-versions', pairingId] });
+      qc.invalidateQueries({ queryKey: ['pairing', pairingId] });
+    },
+  });
+}
+
 export function useUpdateShExMapPairing(id: string) {
   const qc = useQueryClient();
   return useMutation({
