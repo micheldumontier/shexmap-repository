@@ -80,11 +80,75 @@ export function useCreateShExMap() {
   });
 }
 
+export function useUpdateShExMap(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: {
+      title?: string;
+      description?: string;
+      tags?: string[];
+      version?: string;
+      sourceUrl?: string;
+      schemaUrl?: string;
+    }) => apiClient.patch(`/shexmaps/${id}`, data).then((r) => r.data as ShExMap),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['shexmap', id] });
+      qc.invalidateQueries({ queryKey: ['shexmaps'] });
+    },
+  });
+}
+
 export function useDeleteShExMap() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => apiClient.delete(`/shexmaps/${id}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['shexmaps'] }),
+  });
+}
+
+// ─── ShExMap Versions ─────────────────────────────────────────────────────────
+
+export interface ShExMapVersion {
+  id: string;
+  mapId: string;
+  versionNumber: number;
+  filePath: string;
+  commitMessage?: string;
+  authorId: string;
+  authorName: string;
+  createdAt: string;
+}
+
+export interface ShExMapVersionWithContent extends ShExMapVersion {
+  content: string;
+}
+
+export function useShExMapVersions(mapId: string) {
+  return useQuery<ShExMapVersion[]>({
+    queryKey: ['shexmap-versions', mapId],
+    queryFn: () => apiClient.get(`/shexmaps/${mapId}/versions`).then((r) => r.data),
+    enabled: !!mapId,
+  });
+}
+
+export function useShExMapVersion(mapId: string, versionNumber: number | null) {
+  return useQuery<ShExMapVersionWithContent>({
+    queryKey: ['shexmap-version', mapId, versionNumber],
+    queryFn: () =>
+      apiClient.get(`/shexmaps/${mapId}/versions/${versionNumber}`).then((r) => r.data),
+    enabled: !!mapId && versionNumber !== null,
+  });
+}
+
+export function useSaveShExMapVersion(mapId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { content: string; commitMessage?: string }) =>
+      apiClient.post(`/shexmaps/${mapId}/versions`, data).then((r) => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['shexmap-versions', mapId] });
+      qc.invalidateQueries({ queryKey: ['shexmap', mapId] });
+    },
   });
 }
 
@@ -151,6 +215,25 @@ export function useCreateShExMapPairing() {
       version: string;
     }) => apiClient.post('/pairings', data).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['pairings'] }),
+  });
+}
+
+export function useUpdateShExMapPairing(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: {
+      title?: string;
+      description?: string;
+      tags?: string[];
+      version?: string;
+      license?: string;
+      sourceMapId?: string;
+      targetMapId?: string;
+    }) => apiClient.patch(`/pairings/${id}`, data).then((r) => r.data as ShExMapPairing),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['pairing', id] });
+      qc.invalidateQueries({ queryKey: ['pairings'] });
+    },
   });
 }
 

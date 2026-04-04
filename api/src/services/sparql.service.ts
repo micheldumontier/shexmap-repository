@@ -35,18 +35,32 @@ export async function sparqlSelect(
 
 /**
  * Execute a SPARQL UPDATE (INSERT/DELETE).
+ *
+ * sparql-http-client's SimpleClient.store is always null, so we use a direct
+ * fetch POST to the QLever update endpoint. QLever requires a non-empty
+ * access token passed as the `access-token` query parameter.
  */
 export async function sparqlUpdate(
   fastify: FastifyInstance,
   update: string
 ): Promise<void> {
+  const { config } = await import('../config.js');
   const fullUpdate = `${sparqlPrefixes()}\n${update}`;
-  const res = await fastify.sparql.store.update(fullUpdate);
 
-  // SimpleClient's store.update returns a Response
-  if (res && typeof (res as Response).ok !== 'undefined' && !(res as Response).ok) {
-    const body = await (res as Response).text();
-    throw new Error(`SPARQL UPDATE failed (${(res as Response).status}): ${body}`);
+  const url = new URL(config.qlever.updateUrl);
+  if (config.qlever.accessToken) {
+    url.searchParams.set('access-token', config.qlever.accessToken);
+  }
+
+  const res = await fetch(url.toString(), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/sparql-update' },
+    body: fullUpdate,
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`SPARQL UPDATE failed (${res.status}): ${body}`);
   }
 }
 

@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync } from 'fastify';
 import {
   ShExMapPairingCreateSchema,
+  ShExMapPairingUpdateSchema,
   ShExMapPairingQuerySchema,
   ShExMapIdSchema,
 } from '../../models/shexmap.model.js';
@@ -8,6 +9,7 @@ import {
   listShExMapPairings,
   getShExMapPairing,
   createShExMapPairing,
+  updateShExMapPairing,
   deleteShExMapPairing,
 } from '../../services/shexmap.service.js';
 import { config } from '../../config.js';
@@ -40,6 +42,18 @@ const pairingsRoutes: FastifyPluginAsync = async (fastify) => {
       : 'anonymous';
     const pairing = await createShExMapPairing(fastify, data, authorId);
     return reply.code(201).send(pairing);
+  });
+
+  fastify.patch('/:id', {
+    schema: { tags: ['pairings'], summary: 'Update a ShExMap Pairing' },
+    preHandler: [fastify.requireAuth],
+  }, async (request, reply) => {
+    const { id } = ShExMapIdSchema.parse(request.params);
+    const existing = await getShExMapPairing(fastify, id);
+    if (!existing) return reply.notFound(`ShExMapPairing ${id} not found`);
+    const data = ShExMapPairingUpdateSchema.parse(request.body);
+    const updated = await updateShExMapPairing(fastify, id, data);
+    return updated;
   });
 
   fastify.delete('/:id', {

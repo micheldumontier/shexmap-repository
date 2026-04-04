@@ -30,12 +30,18 @@ export default function HomePage() {
             A community hub for ShExMaps — bidirectional mappings between RDF shapes.
             Browse, contribute, and explore coverage across semantic web standards.
           </p>
-          <div className="flex gap-3 justify-center">
+          <div className="flex gap-3 justify-center flex-wrap">
             <Link
               to="/browse"
               className="bg-violet-600 hover:bg-violet-500 text-white font-medium px-6 py-2.5 rounded-lg transition-colors"
             >
               Browse Maps
+            </Link>
+            <Link
+              to="/pairings/create"
+              className="bg-violet-800 hover:bg-violet-700 text-white font-medium px-6 py-2.5 rounded-lg transition-colors"
+            >
+              Create Pairing
             </Link>
             <Link
               to="/submit"

@@ -82,13 +82,33 @@ shexmap:targetMap a owl:ObjectProperty ;
 
 shexmap:hasVersion a owl:ObjectProperty ;
     rdfs:label "has version" ;
-    rdfs:domain shexmap:ShExMapPairing ;
+    rdfs:domain shexmap:ShExMap ;
     rdfs:range shexmap:ShExMapVersion .
 
 shexmap:currentVersion a owl:ObjectProperty ;
     rdfs:label "current version" ;
-    rdfs:domain shexmap:ShExMapPairing ;
+    rdfs:domain shexmap:ShExMap ;
     rdfs:range shexmap:ShExMapVersion .
+
+# ─── ShExMapVersion properties ───────────────────────────────────────────────
+
+shexmap:versionNumber a owl:DatatypeProperty ;
+    rdfs:label "version number" ;
+    rdfs:comment "Monotonically increasing integer version number, starting at 1." ;
+    rdfs:domain shexmap:ShExMapVersion ;
+    rdfs:range xsd:integer .
+
+shexmap:versionFile a owl:DatatypeProperty ;
+    rdfs:label "version file" ;
+    rdfs:comment "Relative path to the versioned ShEx file, e.g. bpdam/v2.shex." ;
+    rdfs:domain shexmap:ShExMapVersion ;
+    rdfs:range xsd:string .
+
+shexmap:commitMessage a owl:DatatypeProperty ;
+    rdfs:label "commit message" ;
+    rdfs:comment "Optional human-readable description of what changed in this version." ;
+    rdfs:domain shexmap:ShExMapVersion ;
+    rdfs:range xsd:string .
 
 # ─── ShExSchema properties ────────────────────────────────────────────────────
 

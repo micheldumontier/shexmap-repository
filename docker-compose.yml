@@ -24,9 +24,10 @@ services:
       NODE_ENV: production
       QLEVER_SPARQL_URL: http://qlever:7001/sparql
       QLEVER_UPDATE_URL: http://qlever:7001/update
+      QLEVER_ACCESS_TOKEN: ${QLEVER_ACCESS_TOKEN:-shexmap-dev-token}
       SHEX_FILES_DIR: /shex-files
     volumes:
-      - ./sparql/files:/shex-files:ro
+      - ./sparql/files:/shex-files:rw
     depends_on:
       qlever-init:
         condition: service_completed_successfully
@@ -60,12 +61,8 @@ services:
   # ─── QLever SPARQL server ──────────────────────────────────────────────────
   qlever:
     image: adfreiburg/qlever:latest
-    entrypoint: ["qlever", "start",
-      "--name", "shexmap",
-      "--description", "ShExMap Repository",
-      "--port", "7001",
-      "--system", "native",
-      "--run-in-foreground"
+    entrypoint: ["sh", "-c",
+      "qlever start --name shexmap --description 'ShExMap Repository' --port 7001 --system native --run-in-foreground --access-token \"${QLEVER_ACCESS_TOKEN:-shexmap-dev-token}\""
     ]
     volumes:
       - qlever-data:/data          # index built by qlever-init

@@ -1,8 +1,9 @@
 import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import Editor from '@monaco-editor/react';
-import { useShExMap } from '../api/shexmaps.js';
+import { useState } from 'react';
+import { useShExMap, useShExMapVersions, useShExMapVersion, useSaveShExMapVersion } from '../api/shexmaps.js';
 import { apiClient } from '../api/client.js';
+import ShExEditor from '../components/editor/ShExEditor.js';
 
 export default function ShExMapPage() {
   const { id } = useParams<{ id: string }>();
@@ -90,12 +91,12 @@ export default function ShExMapPage() {
         )}
       </div>
 
-      {/* File content */}
+      {/* File content — inline ShEx editor with LSP support */}
       <FileContentPanel
+        mapId={map.id}
         fileName={map.fileName}
         fileFormat={map.fileFormat}
         inlineContent={map.content}
-        downloadUrl={map.sourceUrl}
       />
     </div>
   );
@@ -111,17 +112,18 @@ function MetaRow({ label, value, mono }: { label: string; value: string; mono?: 
 }
 
 function FileContentPanel({
+  mapId,
   fileName,
   fileFormat,
   inlineContent,
-  downloadUrl,
 }: {
+  mapId: string;
   fileName?: string;
   fileFormat: string;
   inlineContent?: string;
-  downloadUrl?: string;
 }) {
-  // Fetch from /files endpoint if no inline content but we have a fileName
+  const [loadingVersionNumber, setLoadingVersionNumber] = useState<number | null>(null);
+
   const { data: fetchedContent, isLoading, isError } = useQuery<string>({
     queryKey: ['shex-file', fileName],
     queryFn: () =>
@@ -131,33 +133,27 @@ function FileContentPanel({
     enabled: !inlineContent && !!fileName,
   });
 
-  const content = inlineContent ?? fetchedContent;
+  const { data: serverVersions } = useShExMapVersions(mapId);
+  const { data: loadedServerVersion } = useShExMapVersion(mapId, loadingVersionNumber);
+  const saveVersionMutation = useSaveShExMapVersion(mapId);
+
+  // When a server version is loaded, use its content; otherwise fall back to file/inline
+  const content = loadedServerVersion?.content ?? inlineContent ?? fetchedContent;
 
   if (!fileName && !inlineContent) return null;
-
-  const editorLang = fileFormat === 'shexj' ? 'json' : 'turtle';
 
   return (
     <div className="rounded-xl border border-slate-200 shadow-sm overflow-hidden bg-white">
       {/* Panel header */}
       <div className="flex items-center justify-between bg-slate-800 px-4 py-2.5">
-        <span className="text-sm font-medium text-slate-100 font-mono">{fileName ?? 'inline content'}</span>
-        <div className="flex items-center gap-3">
-          <span className="text-xs bg-slate-700 text-slate-300 px-2 py-0.5 rounded font-mono">
-            {fileFormat}
-          </span>
-          {downloadUrl && (
-            <a
-              href={downloadUrl}
-              className="text-xs text-violet-400 hover:text-violet-300 transition-colors"
-              target="_blank"
-              rel="noreferrer"
-              download={fileName}
-            >
-              ↓ download
-            </a>
-          )}
-        </div>
+        <span className="text-sm font-medium text-slate-100 font-mono">
+          {loadedServerVersion
+            ? `${fileName ?? mapId} @ v${loadedServerVersion.versionNumber}`
+            : (fileName ?? 'inline content')}
+        </span>
+        <span className="text-xs bg-slate-700 text-slate-300 px-2 py-0.5 rounded font-mono">
+          {fileFormat}
+        </span>
       </div>
 
       {isLoading && (
@@ -171,19 +167,17 @@ function FileContentPanel({
         </div>
       )}
       {content !== undefined && (
-        <Editor
-          height={400}
-          defaultLanguage={editorLang}
+        <ShExEditor
           value={content}
-          options={{
-            readOnly: true,
-            minimap: { enabled: false },
-            scrollBeyondLastLine: false,
-            fontSize: 13,
-            lineNumbers: 'on',
-            wordWrap: 'on',
-          }}
-          theme="vs-dark"
+          mapId={mapId}
+          fileName={fileName}
+          fileFormat={fileFormat}
+          height={400}
+          readOnly={true}
+          serverVersions={serverVersions}
+          onSaveServerVersion={(c, msg) => saveVersionMutation.mutate({ content: c, commitMessage: msg })}
+          isSavingServerVersion={saveVersionMutation.isPending}
+          onLoadServerVersion={(vn) => setLoadingVersionNumber(vn)}
         />
       )}
     </div>

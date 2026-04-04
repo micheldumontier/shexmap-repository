@@ -55,6 +55,30 @@ export interface ShExMap {
   stars: number;
 }
 
+// ─── ShExMap Version ──────────────────────────────────────────────────────────
+
+export const SaveVersionSchema = z.object({
+  content: z.string().min(1),
+  commitMessage: z.string().max(500).optional(),
+});
+
+export type SaveVersion = z.infer<typeof SaveVersionSchema>;
+
+export interface ShExMapVersion {
+  id: string;             // "{mapId}-v{n}"
+  mapId: string;
+  versionNumber: number;
+  filePath: string;       // "{mapId}/v{n}.shex" relative to filesDir
+  commitMessage?: string;
+  authorId: string;
+  authorName: string;
+  createdAt: string;
+}
+
+export interface ShExMapVersionWithContent extends ShExMapVersion {
+  content: string;
+}
+
 // ─── ShExMap Pairing ──────────────────────────────────────────────────────────
 
 export const ShExMapPairingCreateSchema = z.object({

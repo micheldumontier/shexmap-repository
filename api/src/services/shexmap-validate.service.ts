@@ -116,6 +116,13 @@ function applyReverseRegex(
 
 // ── Validation walker ─────────────────────────────────────────────────────────
 
+/** Return the RDF term for a focus string. Blank nodes are encoded as "_:localId". */
+function focusTerm(focus: string) {
+  return focus.startsWith('_:')
+    ? DataFactory.blankNode(focus.slice(2))
+    : DataFactory.namedNode(focus);
+}
+
 function walkShape(
   shapeId: string,
   focusNode: string,
@@ -184,19 +191,45 @@ function walkTriple(
   node: BindingNode,
   visited: Set<string>,
 ): void {
-  const quads = store.getQuads(DataFactory.namedNode(focus), DataFactory.namedNode(tc.predicate), null, null);
+  const quads = store.getQuads(focusTerm(focus), DataFactory.namedNode(tc.predicate), null, null);
   const mapInfo = getMapInfo(tc.semActs, prefixes);
 
   for (const quad of quads) {
     const obj = quad.object;
+    // Encode blank node object IRIs so recursive lookups use blankNode(), not namedNode()
+    const childFocus = obj.termType === 'BlankNode' ? `_:${obj.value}` : obj.value;
 
-    // Record binding if there's a Map annotation on this triple constraint
+    // Record binding(s) if there's a Map annotation on this triple constraint
     if (mapInfo?.type === 'var') {
       node.bindings.push({
         variable: mapInfo.variable,
         value: obj.value,
         datatype: obj.termType === 'Literal' ? (obj as any).datatype?.value : undefined,
       });
+    } else if (mapInfo?.type === 'regex' && obj.termType === 'Literal') {
+      // JS named capture groups don't allow ':' in names, so we sanitize them
+      // before building the RegExp and map back to the original names afterwards.
+      try {
+        const nameMap = new Map<string, string>(); // sanitized → original
+        const sanitizedBody = mapInfo.body.replace(
+          /\(\?<([^>]+)>/g,
+          (_: string, name: string) => {
+            const safe = name.replace(/[^a-zA-Z0-9_]/g, '_');
+            nameMap.set(safe, name);
+            return `(?<${safe}>`;
+          },
+        );
+        const rx = new RegExp(sanitizedBody);
+        const m = rx.exec(obj.value);
+        if (m?.groups) {
+          for (const [safeName, value] of Object.entries(m.groups)) {
+            if (value !== undefined) {
+              const origName = nameMap.get(safeName) ?? safeName;
+              node.bindings.push({ variable: resolveVar(origName, prefixes), value });
+            }
+          }
+        }
+      } catch { /* malformed regex — skip */ }
     }
 
     if (obj.termType === 'Literal') continue;
@@ -204,7 +237,7 @@ function walkTriple(
     // Shape reference → recurse into named shape
     const refId = shapeRefId(tc.valueExpr);
     if (refId) {
-      const child = walkShape(refId, obj.value, schema, store, prefixes, visited);
+      const child = walkShape(refId, childFocus, schema, store, prefixes, visited);
       if (child.bindings.length > 0 || child.children.length > 0) node.children.push(child);
       continue;
     }
@@ -215,11 +248,11 @@ function walkTriple(
       const predLocal = (tc.predicate as string).split(/[/#]/).pop() ?? tc.predicate;
       const inner: BindingNode = {
         shape: `(@ ${predLocal})`,
-        focus: obj.value,
+        focus: childFocus,
         bindings: [],
         children: [],
       };
-      walkExpr(ve, obj.value, schema, store, prefixes, inner, visited);
+      walkExpr(ve, childFocus, schema, store, prefixes, inner, visited);
       if (inner.bindings.length > 0 || inner.children.length > 0) node.children.push(inner);
     }
   }
@@ -300,28 +333,74 @@ function materializeTriple(
     return;
   }
 
-  // No Map annotation → nested shape or shape reference
+  // No Map annotation — check for shape reference, inline shape, or constant value
   const ve = tc.valueExpr as any;
-  if (!ve || typeof ve !== 'object') return;
 
+  // Shape reference (valueExpr is a plain IRI string, or {type:'ShapeRef',...})
   const refId = shapeRefId(ve);
-  const isInlineShape = ['Shape', 'EachOf', 'OneOf'].includes(ve.type as string);
-
-  if (refId || isInlineShape) {
+  if (refId) {
     const bn = DataFactory.blankNode(`b${counter.n++}`) as N3BlankNode;
     const nestedQuads: N3Quad[] = [];
-
-    if (refId) {
-      materializeShape(refId, bn, schema, prefixes, bindings, nestedQuads, counter);
-    } else {
-      materializeExpr(ve, bn, schema, prefixes, bindings, nestedQuads, counter);
-    }
-
+    materializeShape(refId, bn, schema, prefixes, bindings, nestedQuads, counter);
     if (nestedQuads.length > 0) {
       quads.push(DataFactory.quad(subject, pred, bn) as unknown as N3Quad);
       quads.push(...nestedQuads);
     }
+    return;
   }
+
+  if (!ve || typeof ve !== 'object') return;
+
+  // Inline shape expression
+  if (['Shape', 'EachOf', 'OneOf'].includes(ve.type as string)) {
+    const bn = DataFactory.blankNode(`b${counter.n++}`) as N3BlankNode;
+    const nestedQuads: N3Quad[] = [];
+    materializeExpr(ve, bn, schema, prefixes, bindings, nestedQuads, counter);
+    if (nestedQuads.length > 0) {
+      quads.push(DataFactory.quad(subject, pred, bn) as unknown as N3Quad);
+      quads.push(...nestedQuads);
+    }
+    return;
+  }
+
+  // NodeConstraint with a single constant value (e.g. [fhir:Observation], [sct:Blood_Pressure])
+  if (ve.type === 'NodeConstraint' && Array.isArray(ve.values) && ve.values.length === 1) {
+    const val = ve.values[0];
+    if (typeof val === 'string') {
+      // IRI constant
+      quads.push(DataFactory.quad(subject, pred, DataFactory.namedNode(val)) as unknown as N3Quad);
+    } else if (val && typeof val === 'object' && 'value' in val) {
+      // Literal constant
+      const obj = val.datatype
+        ? DataFactory.literal(val.value as string, DataFactory.namedNode(val.datatype as string))
+        : DataFactory.literal(val.value as string);
+      quads.push(DataFactory.quad(subject, pred, obj) as unknown as N3Quad);
+    }
+  }
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/**
+ * Normalise a focus-node value entered by the user.
+ *
+ * Accepts several common formats:
+ *   <tag:BPfhir123>@START   → tag:BPfhir123
+ *   <http://ex.org/node1>   → http://ex.org/node1
+ *   http://ex.org/node1     → http://ex.org/node1
+ *   tag:BPfhir123           → tag:BPfhir123
+ *
+ * The @ShapeName suffix (e.g. @START) is stripped because this validator
+ * always validates against schema.start automatically.
+ */
+function normalizeFocusNode(raw: string): string {
+  let s = raw.trim();
+  // Strip @ShapeName or @START suffix (before stripping brackets)
+  const atIdx = s.lastIndexOf('@');
+  if (atIdx > 0) s = s.slice(0, atIdx).trim();
+  // Strip surrounding angle brackets
+  if (s.startsWith('<') && s.endsWith('>')) s = s.slice(1, -1);
+  return s;
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
@@ -334,6 +413,10 @@ export async function validate(
   targetNode?: string,
 ): Promise<ValidationResult> {
   const errors: string[] = [];
+
+  // Normalise focus node (strips angle brackets and @ShapeName suffix)
+  sourceNode = normalizeFocusNode(sourceNode);
+  if (targetNode) targetNode = normalizeFocusNode(targetNode);
 
   // 1. Parse source ShEx
   let schema: any;
