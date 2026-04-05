@@ -28,9 +28,6 @@ docker run --rm \
     cd /data
     rm -f ./*.ttl
     cp /sparql-data/ontology/*.ttl .
-    cp /sparql-data/seed/shexmaps/*.ttl . 2>/dev/null || true
-    cp /sparql-data/seed/pairings/*.ttl . 2>/dev/null || true
-    cp /sparql-data/seed/*.ttl . 2>/dev/null || true
     { grep -h '^@prefix' ./*.ttl | sort -u; echo ''; grep -hv '^@prefix' ./*.ttl | grep -v '^#' | grep -v '^[[:space:]]*$'; } > merged.ttl
     chown -R 999:999 /data
     echo '{}' > settings.json

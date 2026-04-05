@@ -1,7 +1,5 @@
-import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
-import { join, basename } from 'node:path';
 import type { FastifyInstance } from 'fastify';
-import type { ShExMapVersion, ShExMapVersionWithContent } from '../models/shexmap.model.js';
+import type { ShExMapVersion } from '../models/shexmap.model.js';
 import { sparqlSelect, sparqlUpdate } from './sparql.service.js';
 import { PREFIXES } from '../rdf/prefixes.js';
 
@@ -41,7 +39,6 @@ function rowToVersion(r: Record<string, { value: string } | undefined>, mapId: s
     id: `${mapId}-v${vn}`,
     mapId,
     versionNumber: vn,
-    filePath: r['filePath']?.value ?? `${mapId}/v${vn}.shex`,
     commitMessage: r['commitMessage']?.value,
     authorId: r['authorId']?.value?.split('/').pop() ?? '',
     authorName: r['authorName']?.value ?? 'Unknown',
@@ -59,13 +56,12 @@ export async function listVersions(
   const mapIri = `${RM}${mapId}`;
 
   const sparql = `
-    SELECT ?versionNumber ?filePath ?commitMessage ?authorId ?authorName ?createdAt
+    SELECT ?versionNumber ?commitMessage ?authorId ?authorName ?createdAt
     WHERE {
       <${mapIri}> <${SM}hasVersion> ?v .
       ?v <${SM}versionNumber> ?versionNumber ;
          dct:creator ?authorId ;
          dct:created ?createdAt .
-      OPTIONAL { ?v <${SM}versionFile> ?filePath }
       OPTIONAL { ?v <${SM}commitMessage> ?commitMessage }
       OPTIONAL { ?authorId schema:name ?authorName }
     }
@@ -85,12 +81,11 @@ export async function getVersion(
   const versionIri = `${RV}${mapId}-v${versionNumber}`;
 
   const sparql = `
-    SELECT ?versionNumber ?filePath ?commitMessage ?authorId ?authorName ?createdAt
+    SELECT ?versionNumber ?commitMessage ?authorId ?authorName ?createdAt
     WHERE {
       <${versionIri}> <${SM}versionNumber> ?versionNumber ;
                       dct:creator ?authorId ;
                       dct:created ?createdAt .
-      OPTIONAL { <${versionIri}> <${SM}versionFile> ?filePath }
       OPTIONAL { <${versionIri}> <${SM}commitMessage> ?commitMessage }
       OPTIONAL { ?authorId schema:name ?authorName }
     }
@@ -102,20 +97,29 @@ export async function getVersion(
 }
 
 export async function getVersionContent(
-  filesDir: string,
+  fastify: FastifyInstance,
   mapId: string,
   versionNumber: number,
 ): Promise<string> {
   assertSafeId(mapId, 'mapId');
-  // basename guards against any traversal in mapId even after assertSafeId
-  const filePath = join(filesDir, basename(mapId), `v${versionNumber}.shex`);
-  if (!existsSync(filePath)) throw new Error(`Version file not found: ${filePath}`);
-  return readFileSync(filePath, 'utf8');
+  const versionIri = `${RV}${mapId}-v${versionNumber}`;
+
+  const sparql = `
+    SELECT ?content
+    WHERE {
+      <${versionIri}> <${SM}versionContent> ?content .
+    }
+  `;
+
+  const rows = await sparqlSelect(fastify, sparql);
+  if (!rows.length || !rows[0]?.['content']?.value) {
+    throw new Error(`Content not found for version ${versionNumber} of map ${mapId}`);
+  }
+  return rows[0]['content'].value;
 }
 
 export async function saveNewVersion(
   fastify: FastifyInstance,
-  filesDir: string,
   mapId: string,
   authorId: string,
   content: string,
@@ -142,20 +146,13 @@ export async function saveNewVersion(
 
     const versionId  = `${mapId}-v${nextN}`;
     const versionIri = `${RV}${versionId}`;
-    const relPath    = `${mapId}/v${nextN}.shex`;
 
-    // 2. Write the file (do this before SPARQL so orphaned files are harmless)
-    const dir = join(filesDir, mapId);
-    mkdirSync(dir, { recursive: true });
-    const filePath = join(dir, `v${nextN}.shex`);
-    writeFileSync(filePath, content, 'utf8');
-
-    // 3. INSERT version node
+    // 2. INSERT version node with content stored in SPARQL
     const insertVersion = `
       INSERT DATA {
         <${versionIri}> a <${SM}ShExMapVersion> ;
           <${SM}versionNumber> ${nextN} ;
-          <${SM}versionFile> "${escapeStr(relPath)}" ;
+          <${SM}versionContent> """${content}""" ;
           dct:creator <${authorIri}> ;
           dct:created "${now}"^^xsd:dateTime .
         ${commitMessage ? `<${versionIri}> <${SM}commitMessage> "${escapeStr(commitMessage)}" .` : ''}
@@ -164,7 +161,7 @@ export async function saveNewVersion(
     `;
     await sparqlUpdate(fastify, insertVersion);
 
-    // 4. UPDATE currentVersion and dct:modified on the parent map
+    // 3. UPDATE currentVersion and dct:modified on the parent map
     const updateParent = `
       DELETE { <${mapIri}> <${SM}currentVersion> ?old ; dct:modified ?m }
       INSERT { <${mapIri}> <${SM}currentVersion> <${versionIri}> ; dct:modified "${now}"^^xsd:dateTime }
@@ -176,7 +173,6 @@ export async function saveNewVersion(
       id: versionId,
       mapId,
       versionNumber: nextN,
-      filePath: relPath,
       commitMessage,
       authorId,
       authorName: '',

@@ -68,7 +68,6 @@ export interface ShExMapVersion {
   id: string;             // "{mapId}-v{n}"
   mapId: string;
   versionNumber: number;
-  filePath: string;       // "{mapId}/v{n}.shex" relative to filesDir
   commitMessage?: string;
   authorId: string;
   authorName: string;

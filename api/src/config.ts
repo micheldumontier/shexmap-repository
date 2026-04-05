@@ -40,5 +40,4 @@ export const config = {
     accessToken: optional('QLEVER_ACCESS_TOKEN', ''),
   },
 
-  filesDir: optional('SHEX_FILES_DIR', '/shex-files'),
 } as const;

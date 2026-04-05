@@ -105,7 +105,7 @@ const shexmapsRoutes: FastifyPluginAsync = async (fastify) => {
     const authorId = config.auth.enabled
       ? (request.user as { sub: string }).sub
       : 'anonymous';
-    const version = await saveNewVersion(fastify, config.filesDir, id, authorId, content, commitMessage);
+    const version = await saveNewVersion(fastify, id, authorId, content, commitMessage);
     return reply.code(201).send(version);
   });
 
@@ -118,7 +118,7 @@ const shexmapsRoutes: FastifyPluginAsync = async (fastify) => {
     if (isNaN(vn) || vn < 1) return reply.badRequest('Version number must be a positive integer');
     const version = await getVersion(fastify, id, vn);
     if (!version) return reply.notFound(`Version ${vn} of ShExMap ${id} not found`);
-    const content = await getVersionContent(config.filesDir, id, vn);
+    const content = await getVersionContent(fastify, id, vn);
     return { ...version, content };
   });
 

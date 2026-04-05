@@ -44,6 +44,13 @@ cd frontend && npm test
 # Force full QLever index rebuild (wipes volume, rebuilds from sparql/seed/ + ontology)
 ./scripts/rebuild-index.sh
 
+# Backup the live triplestore to a Turtle file
+./scripts/backup-db.sh                        # → sparql/backup/YYYY-MM-DDTHH-MM-SS.ttl
+./scripts/backup-db.sh path/to/output.ttl     # custom output path
+
+# Restore the triplestore from a Turtle backup (destructive — prompts for confirmation)
+./scripts/restore-db.sh sparql/backup/YYYY-MM-DDTHH-MM-SS.ttl
+
 # Validate a ShExMap file
 npx tsx scripts/validate-shexmap.ts path/to/map.shexmap
 ```
@@ -76,7 +83,7 @@ api:3000 → qlever:7001  (direct SPARQL queries, not through nginx)
 - [frontend/src/components/coverage/](frontend/src/components/coverage/) — Recharts coverage heatmap
 - [sparql/ontology/shexmap.ttl](sparql/ontology/shexmap.ttl) — RDF ontology; defines all vocabulary used in the triplestore
 - [sparql/seed/](sparql/seed/) — optional seed Turtle files loaded into QLever on first start (subdirs: `shexmaps/`, `pairings/`); starts empty — add `.ttl` files here to pre-populate
-- [sparql/files/](sparql/files/) — versioned ShExMap file store; each map gets a subdirectory `{id}/v{n}.shex`
+- [sparql/backup/](sparql/backup/) — Turtle backups written by `scripts/backup-db.sh`
 - [sparql/queries/](sparql/queries/) — reference SPARQL queries (`.rq` = SELECT, `.ru` = UPDATE)
 - [docker/nginx/nginx.conf](docker/nginx/nginx.conf) — reverse proxy routing for all services
 
@@ -131,6 +138,12 @@ The index build runs in the `qlever-init` init-container and gates all other ser
 
 **Index builder**: `init-index.sh` calls `/qlever/qlever-index` directly (not the `qlever` CLI wrapper, which requires a Qleverfile and fails in headless mode).
 
-**Rebuild script**: `scripts/rebuild-index.sh` bypasses the `qlever-perms`/`qlever-init` compose dependency chain entirely — it uses a plain `docker run` as root to clear the volume and rebuild, avoiding a persistent docker volume permission issue where `qlever-perms` (chmod 777) does not take effect for the subsequent `qlever-init` container mount.
+**Rebuild script** (`scripts/rebuild-index.sh`): bypasses the `qlever-perms`/`qlever-init` compose dependency chain entirely — it uses a plain `docker run` as root to clear the volume and rebuild, avoiding a persistent docker volume permission issue where `qlever-perms` (chmod 777) does not take effect for the subsequent `qlever-init` container mount. Seed files from `sparql/seed/` and the ontology from `sparql/ontology/` are merged and indexed. **Wipes all runtime data.**
+
+**Backup script** (`scripts/backup-db.sh`): issues a `CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o }` query against the live QLever SPARQL endpoint and saves the result as Turtle to `sparql/backup/`. Requires QLever to be running.
+
+**Restore script** (`scripts/restore-db.sh`): stops QLever, rebuilds the index from a Turtle backup file, and restarts QLever. Prompts for confirmation before proceeding. Use this to recover from a rebuild that wiped needed data.
 
 **No sample data by default**: `sparql/seed/` directories are empty. The QLever index starts with only the ontology triples. Add `.ttl` files under `sparql/seed/shexmaps/` or `sparql/seed/pairings/` to pre-populate on fresh index builds.
+
+**ShEx version content**: ShExMap version content is stored directly in SPARQL as the `shexmap:versionContent` literal on each `ShExMapVersion` node — there is no filesystem file store.

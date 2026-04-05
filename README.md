@@ -78,15 +78,42 @@ Navigate to `/pairings/create` (or click **Create Pairing** in the nav).
 4. **Paired validation** — use section 3 to validate across both sides. Choose a direction (Source→Target or Target→Source), then **Validate** to extract bindings or **Validate & Materialise** to also generate target RDF.
 5. **Save** — fill in the pairing metadata (title, tags, version, license) and click **Save Pairing**. On subsequent edits, an optional change note can be entered before clicking **Update Pairing**, which saves metadata and creates a version snapshot in one step. Use **↓ Download** to export the pairing as JSON.
 
-## Sample Data
+## QLever Data Management
 
-The repository starts empty (no pre-loaded ShExMaps or pairings). To pre-populate the QLever index with seed data, add Turtle files to `sparql/seed/shexmaps/` and `sparql/seed/pairings/` before the first run, then start with `docker compose up --build`.
+QLever stores all ShExMap data as RDF triples in an on-disk index. The index is built once at startup from Turtle files and updated at runtime via SPARQL UPDATE. Three scripts manage the lifecycle of this data.
 
-To rebuild the index from seed files at any time (this wipes all runtime-created data):
+### Initial setup / index rebuild
+
+The repository starts empty. To pre-populate with seed data, add Turtle files to `sparql/seed/shexmaps/` and `sparql/seed/pairings/` before the first run.
+
+To rebuild the index from the current seed and ontology files (wipes all runtime data):
 
 ```bash
 ./scripts/rebuild-index.sh
 ```
+
+This stops QLever, wipes the data volume, copies the ontology and all seed Turtle files, rebuilds the index, and restarts QLever.
+
+### Backup
+
+Dump the live triplestore to a Turtle file:
+
+```bash
+./scripts/backup-db.sh                          # writes to sparql/backup/YYYY-MM-DDTHH-MM-SS.ttl
+./scripts/backup-db.sh my-backup.ttl            # write to a specific file
+```
+
+Requires a running QLever instance. The script issues a `CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o }` query and saves the result as Turtle.
+
+### Restore
+
+Rebuild the QLever index from a previously saved backup:
+
+```bash
+./scripts/restore-db.sh sparql/backup/2026-01-01T00-00-00.ttl
+```
+
+This stops QLever, rebuilds the index from the backup file, and restarts QLever. **Destructive** — the current index is wiped before restore. The script prompts for confirmation before proceeding.
 
 ## Contributing
 

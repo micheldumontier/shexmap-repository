@@ -25,10 +25,6 @@ services:
       QLEVER_SPARQL_URL: http://qlever:7001/sparql
       QLEVER_UPDATE_URL: http://qlever:7001/update
       QLEVER_ACCESS_TOKEN: ${QLEVER_ACCESS_TOKEN:-shexmap-dev-token}
-      SHEX_FILES_DIR: /shex-files
-      QLEVER_ACCESS_TOKEN: ${QLEVER_ACCESS_TOKEN:-very_secure_token}
-    volumes:
-      - ./sparql/files:/shex-files:rw
     depends_on:
       qlever-init:
         condition: service_completed_successfully
