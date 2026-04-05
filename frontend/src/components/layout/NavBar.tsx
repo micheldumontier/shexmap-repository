@@ -3,7 +3,7 @@ import { useAuthStore } from '../../store/authStore.js';
 
 const NAV_LINKS = [
   { to: '/browse', label: 'Browse' },
-  { to: '/create', label: 'Map' },
+  { to: '/pairings/create', label: 'Create' },
   // { to: '/coverage', label: 'Coverage' },
   { to: '/query', label: 'SPARQL' },
 ];
