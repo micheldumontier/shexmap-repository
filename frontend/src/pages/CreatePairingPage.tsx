@@ -256,29 +256,57 @@ function MapSelector({
   onSelect: (id: string) => void;
 }) {
   const [q, setQ] = useState('');
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
   const { data } = useShExMaps({ q: q || undefined, limit: 20, sort: 'modified' });
 
+  const selected = data?.items.find((m) => m.id === selectedId);
+  const displayValue = open ? q : (selected ? (selected.title || selected.id) : '');
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+        setQ('');
+      }
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col gap-1.5" ref={containerRef}>
       <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">{label}</span>
-      <div className="flex gap-2">
+      <div className="relative">
         <input
           type="text"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Search maps…"
-          className="flex-1 text-sm bg-slate-700 text-slate-200 placeholder-slate-500 border border-slate-600 rounded px-2.5 py-1.5 focus:outline-none focus:border-violet-400"
+          value={displayValue}
+          onChange={(e) => { setQ(e.target.value); setOpen(true); }}
+          onFocus={() => { setQ(''); setOpen(true); }}
+          placeholder="Search or select a map…"
+          className="w-full text-sm bg-slate-700 text-slate-200 placeholder-slate-500 border border-slate-600 rounded px-2.5 py-1.5 pr-7 focus:outline-none focus:border-violet-400"
         />
-        <select
-          value={selectedId}
-          onChange={(e) => { onSelect(e.target.value); setQ(''); }}
-          className="flex-1 text-sm bg-slate-700 text-slate-200 border border-slate-600 rounded px-2.5 py-1.5 focus:outline-none focus:border-violet-400"
-        >
-          <option value="">— select a map —</option>
-          {data?.items.map((m) => (
-            <option key={m.id} value={m.id}>{m.title || m.id}</option>
-          ))}
-        </select>
+        <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs">▾</span>
+        {open && (
+          <ul className="absolute z-50 mt-1 w-full max-h-56 overflow-y-auto bg-slate-800 border border-slate-600 rounded shadow-lg">
+            <li
+              className="px-3 py-1.5 text-sm text-slate-400 cursor-pointer hover:bg-slate-700"
+              onMouseDown={() => { onSelect(''); setOpen(false); setQ(''); }}
+            >
+              — select a map —
+            </li>
+            {data?.items.map((m) => (
+              <li
+                key={m.id}
+                className={`px-3 py-1.5 text-sm cursor-pointer hover:bg-slate-700 ${m.id === selectedId ? 'text-violet-300 font-medium' : 'text-slate-200'}`}
+                onMouseDown={() => { onSelect(m.id); setOpen(false); setQ(''); }}
+              >
+                {m.title || m.id}
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </div>
   );

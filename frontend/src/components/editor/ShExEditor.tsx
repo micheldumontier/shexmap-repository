@@ -3,7 +3,7 @@
  *  - ShEx language support (syntax highlighting, completions, diagnostics)
  *  - Colour-coded variable annotation decorations
  *  - Toggleable edit/read-only mode
- *  - Local version history saved to localStorage
+ *  - Server version history (load from API)
  *  - Download current content as a file
  */
 
@@ -12,41 +12,6 @@ import Editor, { useMonaco } from '@monaco-editor/react';
 import type * as MonacoType from 'monaco-editor';
 import { registerShexLanguage, SHEXC_LANGUAGE_ID } from '../../utils/shexLanguage.js';
 import { injectVarColors, extractVars } from '../../utils/varColors.js';
-
-// ─── Local version store ──────────────────────────────────────────────────────
-
-export interface LocalVersion {
-  id: string;          // ShExMap id (or synthetic key)
-  version: string;     // semver label
-  content: string;
-  savedAt: string;     // ISO timestamp
-}
-
-const STORAGE_KEY = 'shexmap-local-versions';
-
-function loadVersions(mapId: string): LocalVersion[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const all = JSON.parse(raw) as LocalVersion[];
-    return all.filter((v) => v.id === mapId).sort(
-      (a, b) => new Date(b.savedAt).getTime() - new Date(a.savedAt).getTime(),
-    );
-  } catch {
-    return [];
-  }
-}
-
-function saveVersion(entry: LocalVersion) {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    const all: LocalVersion[] = raw ? (JSON.parse(raw) as LocalVersion[]) : [];
-    all.push(entry);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
-  } catch {
-    // quota exceeded etc. — ignore
-  }
-}
 
 function downloadText(content: string, filename: string) {
   const blob = new Blob([content], { type: 'text/plain' });
@@ -70,7 +35,7 @@ export interface ServerVersion {
 export interface ShExEditorProps {
   /** Value shown / edited */
   value: string;
-  /** ShExMap ID used as localStorage key for version history */
+  /** ShExMap ID (used as a key for resetting state when the map changes) */
   mapId: string;
   /** Suggested filename for downloads (default: "<mapId>.shex") */
   fileName?: string;
@@ -82,8 +47,6 @@ export interface ShExEditorProps {
   readOnly?: boolean;
   /** Map of variable → color-palette index for decoration highlights */
   varColorMap?: Map<string, number>;
-  /** Called when the user saves a new version locally */
-  onVersionSaved?: (entry: LocalVersion) => void;
   /** Server-side version list (from API) */
   serverVersions?: ServerVersion[];
   /** Save current content as a new server version */
@@ -106,7 +69,6 @@ export default function ShExEditor({
   height = 400,
   readOnly: initialReadOnly = true,
   varColorMap,
-  onVersionSaved,
   serverVersions,
   onSaveServerVersion,
   isSavingServerVersion,
@@ -120,11 +82,7 @@ export default function ShExEditor({
   const [readOnly, setReadOnly] = useState(initialReadOnly);
   const [localContent, setLocalContent] = useState(value);
   const [isDirty, setIsDirty] = useState(false);
-  const [versionLabel, setVersionLabel] = useState('');
   const [showVersionHistory, setShowVersionHistory] = useState(false);
-  const [historyTab, setHistoryTab] = useState<'server' | 'local'>('server');
-  const [savedVersions, setSavedVersions] = useState<LocalVersion[]>(() => loadVersions(mapId));
-  const [saveFlash, setSaveFlash] = useState(false);
   const [serverSaveFlash, setServerSaveFlash] = useState(false);
   const [commitMessage, setCommitMessage] = useState('');
 
@@ -193,26 +151,6 @@ export default function ShExEditor({
     editorRef.current?.updateOptions({ readOnly: next });
   }
 
-  // ── Save local draft version ───────────────────────────────────────────────
-
-  function handleSaveVersion() {
-    const content = editorRef.current?.getValue() ?? localContent;
-    const label = versionLabel.trim() || new Date().toISOString();
-    const entry: LocalVersion = {
-      id: mapId,
-      version: label,
-      content,
-      savedAt: new Date().toISOString(),
-    };
-    saveVersion(entry);
-    const versions = loadVersions(mapId);
-    setSavedVersions(versions);
-    setVersionLabel('');
-    onVersionSaved?.(entry);
-    setSaveFlash(true);
-    setTimeout(() => setSaveFlash(false), 1500);
-  }
-
   // ── Save server version ────────────────────────────────────────────────────
 
   function handleSaveServerVersion() {
@@ -221,15 +159,6 @@ export default function ShExEditor({
     setCommitMessage('');
     setServerSaveFlash(true);
     setTimeout(() => setServerSaveFlash(false), 1500);
-  }
-
-  // ── Load a saved version into the editor ──────────────────────────────────
-
-  function handleLoadVersion(v: LocalVersion) {
-    setLocalContent(v.content);
-    editorRef.current?.setValue(v.content);
-    setIsDirty(true);
-    setShowVersionHistory(false);
   }
 
   // ── Download current content ───────────────────────────────────────────────
@@ -261,63 +190,41 @@ export default function ShExEditor({
           {readOnly ? 'Edit' : 'Editing'}
         </button>
 
-        {/* Save controls in edit mode */}
-        {!readOnly && (
+        {/* Server version save — shown in edit mode */}
+        {!readOnly && onSaveServerVersion && (
           <>
-            {/* Local draft save */}
-            <input
-              type="text"
-              value={versionLabel}
-              onChange={(e) => setVersionLabel(e.target.value)}
-              placeholder="draft label"
-              className="text-xs bg-slate-700 text-slate-200 placeholder-slate-400 border border-slate-600 rounded px-2 py-1 w-28 focus:outline-none focus:border-violet-400"
-            />
+
             <button
-              onClick={handleSaveVersion}
-              title="Save draft locally in browser"
+              onClick={handleSaveServerVersion}
+              disabled={isSavingServerVersion}
+              title="Save as a permanent server version"
               className={`text-xs px-3 py-1 rounded font-medium transition-colors ${
-                saveFlash ? 'bg-green-600 text-white' : 'bg-slate-600 text-slate-200 hover:bg-slate-500'
+                serverSaveFlash
+                  ? 'bg-green-600 text-white'
+                  : isSavingServerVersion
+                    ? 'bg-violet-800 text-violet-300 cursor-not-allowed'
+                    : 'bg-violet-600 text-white hover:bg-violet-500'
               }`}
             >
-              {saveFlash ? 'Saved!' : 'Save draft'}
+              {isSavingServerVersion ? 'Saving…' : serverSaveFlash ? 'Saved!' : '↑ Publish'}
             </button>
-
-            {/* Server version save */}
-            {onSaveServerVersion && (
-              <>
-                <input
-                  type="text"
-                  value={commitMessage}
-                  onChange={(e) => setCommitMessage(e.target.value)}
-                  placeholder="commit message (optional)"
-                  className="text-xs bg-slate-700 text-slate-200 placeholder-slate-400 border border-slate-600 rounded px-2 py-1 w-44 focus:outline-none focus:border-violet-400"
-                />
-                <button
-                  onClick={handleSaveServerVersion}
-                  disabled={isSavingServerVersion}
-                  title="Save as a permanent server version"
-                  className={`text-xs px-3 py-1 rounded font-medium transition-colors ${
-                    serverSaveFlash
-                      ? 'bg-green-600 text-white'
-                      : isSavingServerVersion
-                        ? 'bg-violet-800 text-violet-300 cursor-not-allowed'
-                        : 'bg-violet-600 text-white hover:bg-violet-500'
-                  }`}
-                >
-                  {isSavingServerVersion ? 'Saving…' : serverSaveFlash ? 'Saved!' : '↑ Save to server'}
-                </button>
-              </>
-            )}
+            <input
+              type="text"
+              value={commitMessage}
+              onChange={(e) => setCommitMessage(e.target.value)}
+              placeholder="commit message (optional)"
+              className="text-xs bg-slate-700 text-slate-200 placeholder-slate-400 border border-slate-600 rounded px-2 py-1 w-44 focus:outline-none focus:border-violet-400"
+            />
           </>
         )}
 
         {/* Version history button */}
-        {(savedVersions.length > 0 || (serverVersions && serverVersions.length > 0)) && (
+        {serverVersions && serverVersions.length > 0 && (
           <button
             onClick={() => setShowVersionHistory((s) => !s)}
             className="text-xs px-3 py-1 rounded font-medium bg-slate-700 text-slate-300 hover:bg-slate-600 transition-colors"
           >
-            History {serverVersions && serverVersions.length > 0 ? `(${serverVersions.length})` : `(${savedVersions.length})`}
+            History ({serverVersions.length})
           </button>
         )}
 
@@ -335,99 +242,36 @@ export default function ShExEditor({
         )}
       </div>
 
-      {/* Variable legend — all vars extracted from this content */}
-      <VariableLegend localContent={localContent} varColorMap={varColorMap} />
-
-      {/* Version history panel */}
-      {showVersionHistory && (
+      {/* Server version history panel */}
+      {showVersionHistory && serverVersions && serverVersions.length > 0 && (
         <div className="bg-slate-900 border-t border-slate-700 px-3 py-2 max-h-56 overflow-y-auto">
-          {/* Tabs */}
-          <div className="flex gap-2 mb-2">
-            <button
-              onClick={() => setHistoryTab('server')}
-              className={`text-xs px-2 py-0.5 rounded font-medium transition-colors ${
-                historyTab === 'server'
-                  ? 'bg-violet-700 text-white'
-                  : 'text-slate-400 hover:text-slate-300'
-              }`}
-            >
-              Server {serverVersions ? `(${serverVersions.length})` : ''}
-            </button>
-            <button
-              onClick={() => setHistoryTab('local')}
-              className={`text-xs px-2 py-0.5 rounded font-medium transition-colors ${
-                historyTab === 'local'
-                  ? 'bg-slate-600 text-white'
-                  : 'text-slate-400 hover:text-slate-300'
-              }`}
-            >
-              Local drafts ({savedVersions.length})
-            </button>
+          <div className="space-y-1">
+            {[...serverVersions].reverse().map((v) => (
+              <div key={v.versionNumber} className="flex items-center justify-between gap-2 text-xs">
+                <span className="font-mono text-violet-300 shrink-0">v{v.versionNumber}</span>
+                <span className="text-slate-400 truncate flex-1">
+                  {v.commitMessage ?? <span className="italic text-slate-600">no message</span>}
+                </span>
+                <span className="text-slate-500 shrink-0">
+                  {new Date(v.createdAt).toLocaleDateString()}
+                </span>
+                <button
+                  onClick={() => {
+                    onLoadServerVersion?.(v.versionNumber);
+                    setShowVersionHistory(false);
+                  }}
+                  className="text-violet-400 hover:text-violet-300 transition-colors shrink-0"
+                >
+                  Load
+                </button>
+              </div>
+            ))}
           </div>
-
-          {/* Server versions */}
-          {historyTab === 'server' && (
-            <div className="space-y-1">
-              {!serverVersions || serverVersions.length === 0 ? (
-                <p className="text-xs text-slate-500 italic">No server versions yet. Edit and click "↑ Save to server" to create one.</p>
-              ) : (
-                [...serverVersions].reverse().map((v) => (
-                  <div key={v.versionNumber} className="flex items-center justify-between gap-2 text-xs">
-                    <span className="font-mono text-violet-300 shrink-0">v{v.versionNumber}</span>
-                    <span className="text-slate-400 truncate flex-1">
-                      {v.commitMessage ?? <span className="italic text-slate-600">no message</span>}
-                    </span>
-                    <span className="text-slate-500 shrink-0">
-                      {new Date(v.createdAt).toLocaleDateString()}
-                    </span>
-                    <button
-                      onClick={() => {
-                        onLoadServerVersion?.(v.versionNumber);
-                        setShowVersionHistory(false);
-                      }}
-                      className="text-violet-400 hover:text-violet-300 transition-colors shrink-0"
-                    >
-                      Load
-                    </button>
-                  </div>
-                ))
-              )}
-            </div>
-          )}
-
-          {/* Local drafts */}
-          {historyTab === 'local' && (
-            <div className="space-y-1">
-              {savedVersions.length === 0 ? (
-                <p className="text-xs text-slate-500 italic">No local drafts saved.</p>
-              ) : (
-                savedVersions.map((v) => (
-                  <div key={v.savedAt} className="flex items-center justify-between gap-2 text-xs">
-                    <span className="font-mono text-slate-300">{v.version}</span>
-                    <span className="text-slate-500">
-                      {new Date(v.savedAt).toLocaleString()}
-                    </span>
-                    <div className="flex gap-1 ml-auto">
-                      <button
-                        onClick={() => handleLoadVersion(v)}
-                        className="text-violet-400 hover:text-violet-300 transition-colors"
-                      >
-                        Load
-                      </button>
-                      <button
-                        onClick={() => downloadText(v.content, fileName ?? `${mapId}-${v.version}.shex`)}
-                        className="text-slate-400 hover:text-slate-300 transition-colors"
-                      >
-                        ↓
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          )}
         </div>
       )}
+      
+      {/* Variable legend — all vars extracted from this content */}
+      <VariableLegend localContent={localContent} varColorMap={varColorMap} />
 
       {/* Monaco editor */}
       <Editor
