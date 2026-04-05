@@ -12,7 +12,9 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import Editor from '@monaco-editor/react';
+import Editor, { useMonaco } from '@monaco-editor/react';
+import { registerShexLanguage } from '../utils/shexLanguage.js';
+import { registerTurtleLanguage, TURTLE_LANGUAGE_ID } from '../utils/turtleLanguage.js';
 import axios from 'axios';
 import {
   useShExMaps,
@@ -434,6 +436,14 @@ function TurtlePanel({
   validationResult?: ValidationResult | null;
   validationError?: string;
 }) {
+  const monaco = useMonaco();
+  useEffect(() => {
+    if (monaco) {
+      registerShexLanguage(monaco);
+      registerTurtleLanguage(monaco);
+    }
+  }, [monaco]);
+
   function handleAutoGenerate() {
     const stub = autoGenerateTurtle(shexContent);
     onChangeTurtle(stub);
@@ -478,11 +488,10 @@ function TurtlePanel({
       </div>
       <Editor
         height={200}
-        defaultLanguage="plaintext"
-        language="plaintext"
+        language={TURTLE_LANGUAGE_ID}
         value={turtleContent}
         onChange={(v) => handleChange(v ?? '')}
-        theme="vs-dark"
+        theme="shex-dark"
         options={{ minimap: { enabled: false }, scrollBeyondLastLine: false, fontSize: 12, wordWrap: 'on' }}
       />
       <div className="flex items-center gap-2 bg-slate-800 border-t border-slate-700 px-3 py-1.5">

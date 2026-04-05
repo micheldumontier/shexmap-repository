@@ -9,6 +9,7 @@
  */
 
 import type * as Monaco from 'monaco-editor';
+import { TURTLE_THEME_RULES } from './turtleLanguage.js';
 
 export const SHEXC_LANGUAGE_ID = 'shexc';
 
@@ -231,7 +232,7 @@ const HOVER_DOCS: Record<string, string> = {
 
 // ─── Diagnostics via @shexjs/parser ──────────────────────────────────────────
 
-let shexParser: { construct: (opts?: object) => { parse: (schema: string) => unknown } } | null = null;
+let shexParser: { construct: (baseIRI?: string, opts?: object) => { parse: (schema: string) => unknown } } | null = null;
 
 async function getParser() {
   if (shexParser) return shexParser;
@@ -254,7 +255,7 @@ async function validateShex(
   const text = model.getValue();
   const markers: Monaco.editor.IMarkerData[] = [];
   try {
-    parser.construct({ baseIRI: 'https://example.org/' }).parse(text);
+    parser.construct('https://example.org/', {}).parse(text);
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     // Try to extract line/col from the error message (shexjs format: "line N col M")
@@ -290,7 +291,7 @@ export function registerShexLanguage(monaco: typeof Monaco) {
   monaco.editor.defineTheme('shex-dark', {
     base: 'vs-dark',
     inherit: true,
-    rules: SHEXC_THEME_RULES,
+    rules: [...SHEXC_THEME_RULES, ...TURTLE_THEME_RULES],
     colors: {},
   });
 
