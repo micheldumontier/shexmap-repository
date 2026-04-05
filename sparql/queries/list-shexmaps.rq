@@ -4,7 +4,7 @@
 #   ?limitVal     (integer)
 #   ?offsetVal    (integer)
 
-PREFIX shexmap: <https://shexmap.example.org/ontology#>
+PREFIX shexmap: <https://w3id.org/shexmap/ontology#>
 PREFIX dct:     <http://purl.org/dc/terms/>
 PREFIX schema:  <https://schema.org/>
 PREFIX dcat:    <http://www.w3.org/ns/dcat#>

@@ -1,6 +1,7 @@
 import { createRequire } from 'module';
 import { DataFactory, Parser as N3Parser, Store, Writer as N3Writer } from 'n3';
 import type { Quad as N3Quad, NamedNode as N3NamedNode, BlankNode as N3BlankNode } from 'n3';
+import { config } from '../config.js';
 
 const _require = createRequire(import.meta.url);
 const shexParserLib = _require('@shexjs/parser') as {
@@ -8,7 +9,7 @@ const shexParserLib = _require('@shexjs/parser') as {
 };
 
 const MAP_EXT = 'http://shex.io/extensions/Map/#';
-const SHAPE_BASE = 'http://shexmap.example.org/shapes/';
+const SHAPE_BASE = `${config.rdf.baseNamespace}shapes/`;
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 

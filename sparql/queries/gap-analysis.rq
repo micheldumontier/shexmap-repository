@@ -1,6 +1,6 @@
 # Shapes with zero ShExMap coverage (gap analysis)
 # Optionally filter by ?schemaUrl
-PREFIX shexmap: <https://shexmap.example.org/ontology#>
+PREFIX shexmap: <https://w3id.org/shexmap/ontology#>
 PREFIX rdfs:    <http://www.w3.org/2000/01/rdf-schema#>
 
 SELECT ?schema ?shape ?shapeLabel (COUNT(DISTINCT ?map) AS ?mappingCount)

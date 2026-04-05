@@ -1,4 +1,4 @@
-@prefix shexmap: <https://shexmap.example.org/ontology#> .
+@prefix shexmap: <https://w3id.org/shexmap/ontology#> .
 @prefix owl:     <http://www.w3.org/2002/07/owl#> .
 @prefix rdf:     <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs:    <http://www.w3.org/2000/01/rdf-schema#> .
@@ -8,7 +8,7 @@
 
 # ─── Ontology header ──────────────────────────────────────────────────────────
 
-<https://shexmap.example.org/ontology>
+<https://w3id.org/shexmap/ontology>
     a owl:Ontology ;
     dct:title "ShExMap Repository Ontology" ;
     dct:description "OWL vocabulary for describing ShExMaps and their metadata in the ShExMap Repository." .
@@ -83,18 +83,6 @@ shexmap:targetMap a owl:ObjectProperty ;
     rdfs:comment "The ShExMap on the target side of this pairing." ;
     rdfs:domain shexmap:ShExMapPairing ;
     rdfs:range shexmap:ShExMap .
-
-shexmap:sourceFocusIri a owl:DatatypeProperty ;
-    rdfs:label "source focus IRI" ;
-    rdfs:comment "The RDF node IRI used as the focus node when validating the source side of this pairing." ;
-    rdfs:domain shexmap:ShExMapPairing ;
-    rdfs:range xsd:string .
-
-shexmap:targetFocusIri a owl:DatatypeProperty ;
-    rdfs:label "target focus IRI" ;
-    rdfs:comment "The RDF node IRI used as the focus node when validating the target side of this pairing." ;
-    rdfs:domain shexmap:ShExMapPairing ;
-    rdfs:range xsd:string .
 
 shexmap:hasVersion a owl:ObjectProperty ;
     rdfs:label "has version" ;

@@ -119,9 +119,9 @@ api:3000 → qlever:7001  (direct SPARQL queries, not through nginx)
 All ShExMap data is stored as RDF in QLever. The ontology is at [sparql/ontology/shexmap.ttl](sparql/ontology/shexmap.ttl).
 
 Core IRI patterns:
-- ShExMap: `https://shexmap.example.org/resource/{uuid}`
-- User: `https://shexmap.example.org/resource/user/{id}`
-- Schema: `https://shexmap.example.org/resource/schema/{id}`
+- ShExMap: `https://w3id.org/shexmap/resource/{uuid}`
+- User: `https://w3id.org/shexmap/resource/user/{id}`
+- Schema: `https://w3id.org/shexmap/resource/schema/{id}`
 
 ### Authentication
 

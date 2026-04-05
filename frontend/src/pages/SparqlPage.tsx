@@ -2,7 +2,8 @@ import { useState } from 'react';
 import Editor from '@monaco-editor/react';
 import axios from 'axios';
 
-const PREFIXES = `PREFIX shexmap: <https://shexmap.example.org/ontology#>
+const BASE_NS = (import.meta.env.VITE_BASE_NAMESPACE as string | undefined) ?? 'https://w3id.org/shexmap/';
+const PREFIXES = `PREFIX shexmap: <${BASE_NS}ontology#>
 PREFIX dct:     <http://purl.org/dc/terms/>
 PREFIX xsd:     <http://www.w3.org/2001/XMLSchema#>
 

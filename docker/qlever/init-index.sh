@@ -13,6 +13,11 @@ set -e
 
 INDEX_FILE="/data/shexmap.index.pos"
 
+# Base namespace — defaults to the canonical w3id.org IRI baked into the ontology file.
+# Override via BASE_NAMESPACE env var; must end with '/'.
+BASE_NS="${BASE_NAMESPACE:-https://w3id.org/shexmap/}"
+DEFAULT_NS="https://w3id.org/shexmap/"
+
 # ── Restore mode ──────────────────────────────────────────────────────────────
 if [ -n "${RESTORE_FROM:-}" ]; then
     if [ ! -f "${RESTORE_FROM}" ]; then
@@ -52,6 +57,14 @@ cp /sparql-data/ontology/*.ttl .
 cp /sparql-data/seed/shexmaps/*.ttl . 2>/dev/null || true
 cp /sparql-data/seed/pairings/*.ttl . 2>/dev/null || true
 cp /sparql-data/seed/*.ttl . 2>/dev/null || true
+
+# Substitute custom BASE_NAMESPACE into the ontology (and any seed files) if it differs
+if [ "${BASE_NS}" != "${DEFAULT_NS}" ]; then
+    echo "Substituting base namespace: ${DEFAULT_NS} → ${BASE_NS}"
+    for f in ./*.ttl; do
+        sed -i "s|${DEFAULT_NS}|${BASE_NS}|g" "$f"
+    done
+fi
 
 echo "Merging TTL files (prefixes first)..."
 # QLever requires all @prefix declarations before any triples in the stream.

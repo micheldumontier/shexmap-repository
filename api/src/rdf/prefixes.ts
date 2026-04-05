@@ -1,11 +1,15 @@
+import { config } from '../config.js';
+
+const base = config.rdf.baseNamespace; // e.g. 'https://w3id.org/shexmap/'
+
 export const PREFIXES = {
-  shexmap:     'https://shexmap.example.org/ontology#',
-  shexr:       'https://shexmap.example.org/resource/',
-  shexrmap:    'https://shexmap.example.org/resource/map/',
-  shexrschema: 'https://shexmap.example.org/resource/schema/',
-  shexruser:   'https://shexmap.example.org/resource/user/',
-  shexrpair:    'https://shexmap.example.org/resource/pairing/',
-  shexrversion: 'https://shexmap.example.org/resource/version/',
+  shexmap:      `${base}ontology#`,
+  shexr:        `${base}resource/`,
+  shexrmap:     `${base}resource/map/`,
+  shexrschema:  `${base}resource/schema/`,
+  shexruser:    `${base}resource/user/`,
+  shexrpair:    `${base}resource/pairing/`,
+  shexrversion: `${base}resource/version/`,
   shex:        'http://www.w3.org/ns/shex#',
   dcat:    'http://www.w3.org/ns/dcat#',
   dct:     'http://purl.org/dc/terms/',

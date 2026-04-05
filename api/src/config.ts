@@ -40,4 +40,9 @@ export const config = {
     accessToken: optional('QLEVER_ACCESS_TOKEN', ''),
   },
 
+  rdf: {
+    /** Base namespace for all project IRIs, e.g. https://w3id.org/shexmap/ */
+    baseNamespace: optional('BASE_NAMESPACE', 'https://w3id.org/shexmap/'),
+  },
+
 } as const;
