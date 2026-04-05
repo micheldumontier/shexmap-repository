@@ -6,6 +6,7 @@ export const ShExMapCreateSchema = z.object({
   title: z.string().min(1).max(200),
   description: z.string().max(2000).optional(),
   content: z.string().optional(),         // inline ShExMap source text
+  sampleTurtleData: z.string().optional(), // sample Turtle RDF for testing
   fileName: z.string().max(200).optional(),
   fileFormat: z.enum(['shexc', 'shexj']).default('shexc'),
   sourceUrl: z.string().url().optional(), // dct:source — URL to the .shex file
@@ -42,6 +43,7 @@ export interface ShExMap {
   title: string;
   description?: string;
   content?: string;
+  sampleTurtleData?: string;
   fileName?: string;
   fileFormat: string;
   sourceUrl?: string;

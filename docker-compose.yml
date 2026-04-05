@@ -32,17 +32,10 @@ services:
       - shexmap-net
     restart: unless-stopped
 
-  # ─── Volume permission fixer (runs once before qlever-init) ──────────────
-  qlever-perms:
-    image: alpine:latest
-    command: ["chmod", "777", "/data"]
-    volumes:
-      - qlever-data:/data
-    restart: "no"
-
   # ─── QLever index initialiser (runs once, exits) ──────────────────────────
   qlever-init:
     image: adfreiburg/qlever:latest
+    user: "0"
     entrypoint: ["/bin/sh", "/scripts/init-index.sh"]
     environment:
       # Optional: set to a path inside the container to restore from a backup.
@@ -56,9 +49,6 @@ services:
       - ./docker/qlever:/scripts:ro
       - ./sparql/backup:/backups:ro  # backup files available to restore from
     working_dir: /data
-    depends_on:
-      qlever-perms:
-        condition: service_completed_successfully
     networks:
       - shexmap-net
 

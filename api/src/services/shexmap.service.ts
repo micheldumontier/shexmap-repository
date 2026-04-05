@@ -90,7 +90,7 @@ export async function getShExMap(
   const iri = `${RM}${id}`;
 
   const sparql = `
-    SELECT ?title ?description ?content ?fileName ?fileFormat ?sourceUrl ?schemaUrl
+    SELECT ?title ?description ?content ?sampleTurtleData ?fileName ?fileFormat ?sourceUrl ?schemaUrl
            ?authorId ?authorName ?createdAt ?modifiedAt ?version ?stars ?tag
     WHERE {
       <${iri}> a <${SM}ShExMap> ;
@@ -101,6 +101,7 @@ export async function getShExMap(
           schema:version ?version .
       OPTIONAL { <${iri}> dct:description ?description }
       OPTIONAL { <${iri}> <${SM}mappingContent> ?content }
+      OPTIONAL { <${iri}> <${SM}sampleTurtleData> ?sampleTurtleData }
       OPTIONAL { <${iri}> <${SM}fileName> ?fileName }
       OPTIONAL { <${iri}> <${SM}fileFormat> ?fileFormat }
       OPTIONAL { <${iri}> dct:source ?sourceUrl }
@@ -122,6 +123,7 @@ export async function getShExMap(
     title: r['title']?.value ?? '',
     description: r['description']?.value,
     content: r['content']?.value,
+    sampleTurtleData: r['sampleTurtleData']?.value,
     fileName: r['fileName']?.value,
     fileFormat: r['fileFormat']?.value ?? 'shexc',
     sourceUrl: r['sourceUrl']?.value,
@@ -157,9 +159,10 @@ export async function createShExMap(
     INSERT DATA {
       <${iri}> a <${SM}ShExMap> ;
         dct:title "${escapeStr(data.title)}" ;
-        ${data.description ? `dct:description "${escapeStr(data.description)}" ;` : ''}
-        ${data.content    ? `<${SM}mappingContent> """${data.content}""" ;` : ''}
-        ${data.fileName   ? `<${SM}fileName> "${escapeStr(data.fileName)}" ;` : ''}
+        ${data.description      ? `dct:description "${escapeStr(data.description)}" ;` : ''}
+        ${data.content          ? `<${SM}mappingContent> """${data.content}""" ;` : ''}
+        ${data.sampleTurtleData ? `<${SM}sampleTurtleData> """${data.sampleTurtleData}""" ;` : ''}
+        ${data.fileName         ? `<${SM}fileName> "${escapeStr(data.fileName)}" ;` : ''}
         <${SM}fileFormat> "${data.fileFormat}" ;
         ${data.sourceUrl  ? `dct:source <${data.sourceUrl}> ;` : ''}
         ${data.schemaUrl  ? `<${SM}hasSchema> <${data.schemaUrl}> ;` : ''}
@@ -187,40 +190,57 @@ export async function updateShExMap(
   const iri = `${RM}${id}`;
   const now = new Date().toISOString();
 
-  // Delete all mutable properties first
+  // Build per-field conditional DELETE/INSERT/WHERE — only touch fields present in data.
+  const del: string[] = [];
+  const ins: string[] = [];
+  const whr: string[] = [];
+
+  if (data.title !== undefined) {
+    del.push(`<${iri}> dct:title ?title .`);
+    whr.push(`OPTIONAL { <${iri}> dct:title ?title }`);
+    ins.push(`<${iri}> dct:title "${escapeStr(data.title)}" .`);
+  }
+  if (data.description !== undefined) {
+    del.push(`<${iri}> dct:description ?desc .`);
+    whr.push(`OPTIONAL { <${iri}> dct:description ?desc }`);
+    if (data.description) ins.push(`<${iri}> dct:description "${escapeStr(data.description)}" .`);
+  }
+  if (data.tags !== undefined) {
+    del.push(`<${iri}> dcat:keyword ?tag .`);
+    whr.push(`OPTIONAL { <${iri}> dcat:keyword ?tag }`);
+    for (const t of data.tags) ins.push(`<${iri}> dcat:keyword "${escapeStr(t)}" .`);
+  }
+  if (data.version !== undefined) {
+    del.push(`<${iri}> schema:version ?version .`);
+    whr.push(`OPTIONAL { <${iri}> schema:version ?version }`);
+    ins.push(`<${iri}> schema:version "${data.version}" .`);
+  }
+  if (data.sourceUrl !== undefined) {
+    del.push(`<${iri}> dct:source ?sourceUrl .`);
+    whr.push(`OPTIONAL { <${iri}> dct:source ?sourceUrl }`);
+    if (data.sourceUrl) ins.push(`<${iri}> dct:source <${data.sourceUrl}> .`);
+  }
+  if (data.schemaUrl !== undefined) {
+    del.push(`<${iri}> <${SM}hasSchema> ?schemaUrl .`);
+    whr.push(`OPTIONAL { <${iri}> <${SM}hasSchema> ?schemaUrl }`);
+    if (data.schemaUrl) ins.push(`<${iri}> <${SM}hasSchema> <${data.schemaUrl}> .`);
+  }
+  if (data.sampleTurtleData !== undefined) {
+    del.push(`<${iri}> <${SM}sampleTurtleData> ?sampleTurtle .`);
+    whr.push(`OPTIONAL { <${iri}> <${SM}sampleTurtleData> ?sampleTurtle }`);
+    if (data.sampleTurtleData) ins.push(`<${iri}> <${SM}sampleTurtleData> """${data.sampleTurtleData}""" .`);
+  }
+  // Always bump modified
+  del.push(`<${iri}> dct:modified ?modified .`);
+  whr.push(`OPTIONAL { <${iri}> dct:modified ?modified }`);
+  ins.push(`<${iri}> dct:modified "${now}"^^xsd:dateTime .`);
+
   await sparqlUpdate(fastify, `
-    DELETE {
-      <${iri}> dct:title ?title .
-      <${iri}> dct:description ?description .
-      <${iri}> dcat:keyword ?tag .
-      <${iri}> schema:version ?version .
-      <${iri}> dct:modified ?modified .
-      <${iri}> dct:source ?sourceUrl .
-      <${iri}> <${SM}hasSchema> ?schemaUrl .
-    }
-    WHERE {
-      OPTIONAL { <${iri}> dct:title ?title }
-      OPTIONAL { <${iri}> dct:description ?description }
-      OPTIONAL { <${iri}> dcat:keyword ?tag }
-      OPTIONAL { <${iri}> schema:version ?version }
-      OPTIONAL { <${iri}> dct:modified ?modified }
-      OPTIONAL { <${iri}> dct:source ?sourceUrl }
-      OPTIONAL { <${iri}> <${SM}hasSchema> ?schemaUrl }
-    }
+    DELETE { ${del.join(' ')} }
+    INSERT { ${ins.join(' ')} }
+    WHERE  { ${whr.join(' ')} }
   `);
 
-  const tagTriples = (data.tags ?? []).map((t) => `<${iri}> dcat:keyword "${escapeStr(t)}" .`).join('\n    ');
-  const lines = [
-    data.title !== undefined        ? `<${iri}> dct:title "${escapeStr(data.title)}" .` : '',
-    data.description !== undefined  ? `<${iri}> dct:description "${escapeStr(data.description)}" .` : '',
-    data.version !== undefined      ? `<${iri}> schema:version "${data.version}" .` : '',
-    data.sourceUrl !== undefined    ? `<${iri}> dct:source <${data.sourceUrl}> .` : '',
-    data.schemaUrl !== undefined    ? `<${iri}> <${SM}hasSchema> <${data.schemaUrl}> .` : '',
-    `<${iri}> dct:modified "${now}"^^xsd:dateTime .`,
-    tagTriples,
-  ].filter(Boolean).join('\n    ');
-
-  await sparqlUpdate(fastify, `INSERT DATA { ${lines} }`);
   return getShExMap(fastify, id);
 }
 
@@ -319,8 +339,8 @@ export async function getShExMapPairing(
     SELECT ?title ?description ?version ?license ?stars ?tag
            ?authorId ?authorName ?createdAt ?modifiedAt
            ?sourceFocusIri ?targetFocusIri
-           ?srcId ?srcTitle ?srcDesc ?srcContent ?srcFileName ?srcFileFormat ?srcSourceUrl ?srcSchemaUrl
-           ?tgtId ?tgtTitle ?tgtDesc ?tgtContent ?tgtFileName ?tgtFileFormat ?tgtSourceUrl ?tgtSchemaUrl
+           ?srcId ?srcTitle ?srcDesc ?srcContent ?srcSampleTurtle ?srcFileName ?srcFileFormat ?srcSourceUrl ?srcSchemaUrl
+           ?tgtId ?tgtTitle ?tgtDesc ?tgtContent ?tgtSampleTurtle ?tgtFileName ?tgtFileFormat ?tgtSourceUrl ?tgtSchemaUrl
     WHERE {
       <${iri}> a <${SM}ShExMapPairing> ;
           dct:title ?title ;
@@ -340,6 +360,7 @@ export async function getShExMapPairing(
       OPTIONAL { ?srcId dct:title ?srcTitle }
       OPTIONAL { ?srcId dct:description ?srcDesc }
       OPTIONAL { ?srcId <${SM}mappingContent> ?srcContent }
+      OPTIONAL { ?srcId <${SM}sampleTurtleData> ?srcSampleTurtle }
       OPTIONAL { ?srcId <${SM}fileName> ?srcFileName }
       OPTIONAL { ?srcId <${SM}fileFormat> ?srcFileFormat }
       OPTIONAL { ?srcId dct:source ?srcSourceUrl }
@@ -347,6 +368,7 @@ export async function getShExMapPairing(
       OPTIONAL { ?tgtId dct:title ?tgtTitle }
       OPTIONAL { ?tgtId dct:description ?tgtDesc }
       OPTIONAL { ?tgtId <${SM}mappingContent> ?tgtContent }
+      OPTIONAL { ?tgtId <${SM}sampleTurtleData> ?tgtSampleTurtle }
       OPTIONAL { ?tgtId <${SM}fileName> ?tgtFileName }
       OPTIONAL { ?tgtId <${SM}fileFormat> ?tgtFileFormat }
       OPTIONAL { ?tgtId dct:source ?tgtSourceUrl }
@@ -369,6 +391,7 @@ export async function getShExMapPairing(
       title: r['srcTitle']?.value ?? '',
       description: r['srcDesc']?.value,
       content: r['srcContent']?.value,
+      sampleTurtleData: r['srcSampleTurtle']?.value,
       fileName: r['srcFileName']?.value,
       fileFormat: r['srcFileFormat']?.value ?? 'shexc',
       sourceUrl: r['srcSourceUrl']?.value,
@@ -386,6 +409,7 @@ export async function getShExMapPairing(
       title: r['tgtTitle']?.value ?? '',
       description: r['tgtDesc']?.value,
       content: r['tgtContent']?.value,
+      sampleTurtleData: r['tgtSampleTurtle']?.value,
       fileName: r['tgtFileName']?.value,
       fileFormat: r['tgtFileFormat']?.value ?? 'shexc',
       sourceUrl: r['tgtSourceUrl']?.value,

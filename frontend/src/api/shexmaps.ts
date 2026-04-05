@@ -15,6 +15,7 @@ export interface ShExMap {
   title: string;
   description?: string;
   content?: string;
+  sampleTurtleData?: string;
   fileName?: string;
   fileFormat: string;
   sourceUrl?: string;
@@ -90,6 +91,7 @@ export function useUpdateShExMap(id: string) {
       version?: string;
       sourceUrl?: string;
       schemaUrl?: string;
+      sampleTurtleData?: string;
     }) => apiClient.patch(`/shexmaps/${id}`, data).then((r) => r.data as ShExMap),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['shexmap', id] });

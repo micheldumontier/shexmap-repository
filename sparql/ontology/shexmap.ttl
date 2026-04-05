@@ -59,6 +59,12 @@ shexmap:mappingContent a owl:DatatypeProperty ;
     rdfs:domain shexmap:ShExMap ;
     rdfs:range xsd:string .
 
+shexmap:sampleTurtleData a owl:DatatypeProperty ;
+    rdfs:label "sample turtle data" ;
+    rdfs:comment "Sample RDF data in Turtle format for testing and demonstrating this ShExMap." ;
+    rdfs:domain shexmap:ShExMap ;
+    rdfs:range xsd:string .
+
 shexmap:hasSchema a owl:ObjectProperty ;
     rdfs:label "has schema" ;
     rdfs:comment "Links a ShExMap to the ShEx schema whose shapes it annotates." ;

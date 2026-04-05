@@ -867,7 +867,7 @@ function ShExMapSidePanel({
     enabled: !!map?.fileName && !map?.content,
   });
 
-  // When map selection changes: restore turtle and focus IRI from localStorage
+  // When map selection changes: restore turtle and focus IRI from localStorage (fast, immediate)
   const prevMapId = useRef('');
   useEffect(() => {
     if (!selectedMapId || selectedMapId === prevMapId.current) return;
@@ -877,6 +877,16 @@ function ShExMapSidePanel({
     const savedFocus = loadFocus(selectedMapId);
     if (savedFocus) onChangeFocusNode(savedFocus);
   }, [selectedMapId]);
+
+  // When API data loads: prefer sampleTurtleData from server as source of truth
+  const prevApiTurtleMapId = useRef('');
+  useEffect(() => {
+    const apiTurtle = mapQuery.data?.sampleTurtleData;
+    if (!selectedMapId || selectedMapId === prevApiTurtleMapId.current || !apiTurtle) return;
+    prevApiTurtleMapId.current = selectedMapId;
+    onChangeTurtle(apiTurtle);
+    saveTurtle(selectedMapId, apiTurtle);
+  }, [selectedMapId, mapQuery.data?.sampleTurtleData]);
 
   const serverVersions = (versionsQuery.data ?? []).map((v: ShExMapVersion) => ({
     versionNumber: v.versionNumber,
@@ -1079,6 +1089,8 @@ export default function CreatePairingPage() {
     setTgtMapId(p.targetMap.id);
     if (p.sourceMap.content) { setSrcShex(p.sourceMap.content); srcBaselineRef.current = p.sourceMap.content; }
     if (p.targetMap.content) { setTgtShex(p.targetMap.content); tgtBaselineRef.current = p.targetMap.content; }
+    if (p.sourceMap.sampleTurtleData) { setSrcTurtle(p.sourceMap.sampleTurtleData); saveTurtle(p.sourceMap.id, p.sourceMap.sampleTurtleData); }
+    if (p.targetMap.sampleTurtleData) { setTgtTurtle(p.targetMap.sampleTurtleData); saveTurtle(p.targetMap.id, p.targetMap.sampleTurtleData); }
     if (p.sourceFocusIri) setSrcFocus(p.sourceFocusIri);
     if (p.targetFocusIri) setTgtFocus(p.targetFocusIri);
   }, [pairingQuery.data]);
@@ -1161,6 +1173,10 @@ export default function CreatePairingPage() {
       await axios.post(`/api/v1/shexmaps/${tgtMapId}/versions`, { content: tgtShex });
       tgtBaselineRef.current = tgtShex;
     }
+
+    // Persist sample turtle data to both maps
+    if (srcMapId) await apiClient.patch(`/shexmaps/${srcMapId}`, { sampleTurtleData: srcTurtle || '' });
+    if (tgtMapId) await apiClient.patch(`/shexmaps/${tgtMapId}`, { sampleTurtleData: tgtTurtle || '' });
 
     const tags = pairingTags.split(',').map((t) => t.trim()).filter(Boolean);
     const payload = {
