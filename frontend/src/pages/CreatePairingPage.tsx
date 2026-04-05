@@ -1373,7 +1373,6 @@ export default function CreatePairingPage() {
         {savedPairingId && (
           <div className="text-emerald-700 text-sm bg-emerald-50 border border-emerald-200 px-4 py-3 rounded-lg flex items-center gap-3">
             <span>Pairing saved!</span>
-            <Link to={`/pairings/${savedPairingId}`} className="font-medium underline hover:text-emerald-800">View pairing →</Link>
           </div>
         )}
 
