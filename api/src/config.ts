@@ -37,6 +37,7 @@ export const config = {
   qlever: {
     sparqlUrl: optional('QLEVER_SPARQL_URL', 'http://qlever:7001/sparql'),
     updateUrl: optional('QLEVER_UPDATE_URL', 'http://qlever:7001/update'),
+    accessToken: optional('QLEVER_ACCESS_TOKEN', ''),
   },
 
   filesDir: optional('SHEX_FILES_DIR', '/shex-files'),
