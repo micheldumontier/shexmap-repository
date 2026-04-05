@@ -1,11 +1,9 @@
 import { Link } from 'react-router-dom';
-import { useShExMaps, useSchemas, useShExMapPairings } from '../api/shexmaps.js';
+import { useShExMaps, useShExMapPairings } from '../api/shexmaps.js';
 
 export default function HomePage() {
   const { data: maps } = useShExMaps({ limit: 5, sort: 'modified' });
-  const { data: schemas } = useSchemas();
   const { data: pairings } = useShExMapPairings({ limit: 5, sort: 'modified' });
-
 
   return (
     <div className="space-y-14">

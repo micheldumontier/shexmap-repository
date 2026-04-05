@@ -24,25 +24,18 @@ const EXAMPLES: { label: string; description: string; query: string }[] = [
 ORDER BY ?mapTitle`,
   },
   {
-    label: 'Pairings, ShExMaps & Schemas',
-    description: 'Expand each pairing to its source and target maps, plus the schema each map belongs to.',
+    label: 'Pairings and their maps',
+    description: 'Expand each pairing to its source and target shexmaps.',
     query:
       PREFIXES +
-      `SELECT ?pairingTitle ?srcTitle ?srcSchemaTitle ?tgtTitle ?tgtSchemaTitle WHERE {
+      `SELECT ?pairingTitle ?srcTitle ?tgtTitle 
+  {
   ?pairing a shexmap:ShExMapPairing ;
            dct:title ?pairingTitle ;
            shexmap:sourceMap ?srcMap ;
            shexmap:targetMap ?tgtMap .
   ?srcMap dct:title ?srcTitle .
   ?tgtMap dct:title ?tgtTitle .
-  OPTIONAL {
-    ?srcMap shexmap:hasSchema ?srcSchema .
-    ?srcSchema dct:title ?srcSchemaTitle .
-  }
-  OPTIONAL {
-    ?tgtMap shexmap:hasSchema ?tgtSchema .
-    ?tgtSchema dct:title ?tgtSchemaTitle .
-  }
 }
 ORDER BY ?pairingTitle`,
   },
