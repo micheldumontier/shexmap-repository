@@ -7,6 +7,7 @@ An online platform to store, discover, and explore **ShExMaps** — mappings bet
 - **REST API** (`/api/v1/`) with OpenAPI documentation at `/api/v1/docs`
 - **SPARQL 1.1 endpoint** (`/sparql`) backed by [QLever](https://github.com/ad-freiburg/qlever)
 - **React web interface** — browse, search, submit, and visualise ShExMaps
+- **Pairing editor** — side-by-side ShEx authoring with per-side validation, shared variable highlighting, and paired validate/materialise
 - **Mapping graph visualisation** — interactive node-link diagrams of source/target schema relationships
 - **Coverage insights** — heatmaps and gap analysis showing which ShEx standards have mappings
 - **Optional authentication** — OAuth2/OIDC (GitHub, ORCID, Google) + API keys; disabled by default
@@ -66,6 +67,26 @@ All configuration is via environment variables. Copy `.env.example` to `.env`.
 | `AUTH_ENABLED` | `false` | Enable OAuth2/OIDC authentication |
 | `QLEVER_SPARQL_URL` | `http://localhost:7001/sparql` | QLever SPARQL endpoint |
 | `JWT_SECRET` | *(change this)* | Secret for signing JWTs |
+
+## Creating a Pairing
+
+Navigate to `/pairings/create` (or click **Create Pairing** in the nav).
+
+1. **Select ShExMaps** — pick a source and target ShExMap from the dropdowns, or create new ones inline. The latest saved version of each map is loaded automatically.
+2. **Edit ShEx & sample data** — each side has a Monaco ShEx editor and a Sample Turtle Data editor. Turtle data and the focus IRI are saved to browser localStorage per map and restored on next visit.
+3. **Validate per side** — click **Validate** in the Focus IRI row of either panel to check that the ShEx extracts bindings from the sample data. Results appear inline below the editor.
+4. **Paired validation** — use section 3 to validate across both sides. Choose a direction (Source→Target or Target→Source), then **Validate** to extract bindings or **Validate & Materialise** to also generate target RDF.
+5. **Save** — fill in the pairing metadata (title, tags, version, license) and click **Save Pairing**. On subsequent edits, an optional change note can be entered before clicking **Update Pairing**, which saves metadata and creates a version snapshot in one step. Use **↓ Download** to export the pairing as JSON.
+
+## Sample Data
+
+The repository starts empty (no pre-loaded ShExMaps or pairings). To pre-populate the QLever index with seed data, add Turtle files to `sparql/seed/shexmaps/` and `sparql/seed/pairings/` before the first run, then start with `docker compose up --build`.
+
+To rebuild the index from seed files at any time (this wipes all runtime-created data):
+
+```bash
+./scripts/rebuild-index.sh
+```
 
 ## Contributing
 

@@ -304,6 +304,7 @@ export async function getShExMapPairing(
   const sparql = `
     SELECT ?title ?description ?version ?license ?stars ?tag
            ?authorId ?authorName ?createdAt ?modifiedAt
+           ?sourceFocusIri ?targetFocusIri
            ?srcId ?srcTitle ?srcDesc ?srcContent ?srcFileName ?srcFileFormat ?srcSourceUrl ?srcSchemaUrl
            ?tgtId ?tgtTitle ?tgtDesc ?tgtContent ?tgtFileName ?tgtFileFormat ?tgtSourceUrl ?tgtSchemaUrl
     WHERE {
@@ -320,6 +321,8 @@ export async function getShExMapPairing(
       OPTIONAL { ?authorId schema:name ?authorName }
       OPTIONAL { <${iri}> <${SM}stars> ?stars }
       OPTIONAL { <${iri}> dcat:keyword ?tag }
+      OPTIONAL { <${iri}> <${SM}sourceFocusIri> ?sourceFocusIri }
+      OPTIONAL { <${iri}> <${SM}targetFocusIri> ?targetFocusIri }
       OPTIONAL { ?srcId dct:title ?srcTitle }
       OPTIONAL { ?srcId dct:description ?srcDesc }
       OPTIONAL { ?srcId <${SM}mappingContent> ?srcContent }
@@ -381,6 +384,8 @@ export async function getShExMapPairing(
       modifiedAt: '',
       stars: 0,
     },
+    sourceFocusIri: r['sourceFocusIri']?.value,
+    targetFocusIri: r['targetFocusIri']?.value,
     tags,
     license: r['license']?.value,
     version: r['version']?.value ?? '1.0.0',
@@ -414,6 +419,8 @@ export async function createShExMapPairing(
         ${data.description ? `dct:description "${escapeStr(data.description)}" ;` : ''}
         <${SM}sourceMap> <${srcIri}> ;
         <${SM}targetMap> <${tgtIri}> ;
+        ${data.sourceFocusIri ? `<${SM}sourceFocusIri> "${escapeStr(data.sourceFocusIri)}" ;` : ''}
+        ${data.targetFocusIri ? `<${SM}targetFocusIri> "${escapeStr(data.targetFocusIri)}" ;` : ''}
         ${data.license ? `dct:license <${data.license}> ;` : ''}
         schema:version "${data.version}" ;
         dct:creator <${authorIri}> ;
@@ -446,6 +453,8 @@ export async function updateShExMapPairing(
       <${iri}> dct:license ?license .
       <${iri}> <${SM}sourceMap> ?srcMap .
       <${iri}> <${SM}targetMap> ?tgtMap .
+      <${iri}> <${SM}sourceFocusIri> ?srcFocus .
+      <${iri}> <${SM}targetFocusIri> ?tgtFocus .
     }
     WHERE {
       OPTIONAL { <${iri}> dct:title ?title }
@@ -456,6 +465,8 @@ export async function updateShExMapPairing(
       OPTIONAL { <${iri}> dct:license ?license }
       OPTIONAL { <${iri}> <${SM}sourceMap> ?srcMap }
       OPTIONAL { <${iri}> <${SM}targetMap> ?tgtMap }
+      OPTIONAL { <${iri}> <${SM}sourceFocusIri> ?srcFocus }
+      OPTIONAL { <${iri}> <${SM}targetFocusIri> ?tgtFocus }
     }
   `);
 
@@ -467,6 +478,8 @@ export async function updateShExMapPairing(
     data.license !== undefined     ? `<${iri}> dct:license <${data.license}> .` : '',
     data.sourceMapId !== undefined ? `<${iri}> <${SM}sourceMap> <${RM}${data.sourceMapId}> .` : '',
     data.targetMapId !== undefined ? `<${iri}> <${SM}targetMap> <${RM}${data.targetMapId}> .` : '',
+    data.sourceFocusIri !== undefined ? `<${iri}> <${SM}sourceFocusIri> "${escapeStr(data.sourceFocusIri)}" .` : '',
+    data.targetFocusIri !== undefined ? `<${iri}> <${SM}targetFocusIri> "${escapeStr(data.targetFocusIri)}" .` : '',
     `<${iri}> dct:modified "${now}"^^xsd:dateTime .`,
     tagTriples,
   ].filter(Boolean).join('\n    ');

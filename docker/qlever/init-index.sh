@@ -31,14 +31,9 @@ if [ -n "${RESTORE_FROM:-}" ]; then
     } > merged.ttl
 
     echo "Building QLever index from backup..."
-    qlever index \
-        --name shexmap \
-        --input-files merged.ttl \
-        --cat-input-files "cat merged.ttl" \
-        --format ttl \
-        --parallel-parsing false \
-        --system native \
-        --overwrite-existing
+    echo '{}' > settings.json
+    cat merged.ttl | /qlever/qlever-index -i shexmap -s settings.json \
+        --vocabulary-type on-disk-compressed -F ttl -f - -p false
 
     echo "Restore complete."
     exit 0
@@ -54,8 +49,8 @@ echo "Copying seed data into working directory..."
 cd /data
 rm -f ./*.ttl
 cp /sparql-data/ontology/*.ttl .
-cp /sparql-data/seed/shexmaps/*.ttl .
-cp /sparql-data/seed/pairings/*.ttl .
+cp /sparql-data/seed/shexmaps/*.ttl . 2>/dev/null || true
+cp /sparql-data/seed/pairings/*.ttl . 2>/dev/null || true
 cp /sparql-data/seed/*.ttl . 2>/dev/null || true
 
 echo "Merging TTL files (prefixes first)..."
@@ -67,13 +62,8 @@ echo "Merging TTL files (prefixes first)..."
 } > merged.ttl
 
 echo "Building QLever index..."
-qlever index \
-    --name shexmap \
-    --input-files merged.ttl \
-    --cat-input-files "cat merged.ttl" \
-    --format ttl \
-    --parallel-parsing false \
-    --system native \
-    --overwrite-existing
+echo '{}' > settings.json
+cat merged.ttl | /qlever/qlever-index -i shexmap -s settings.json \
+    --vocabulary-type on-disk-compressed -F ttl -f - -p false
 
 echo "Index build complete."

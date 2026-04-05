@@ -128,9 +128,19 @@ export default function ShExEditor({
   const [serverSaveFlash, setServerSaveFlash] = useState(false);
   const [commitMessage, setCommitMessage] = useState('');
 
+  // When a different map is loaded, reset dirty state so external value can sync in.
+  useEffect(() => {
+    setIsDirty(false);
+  }, [mapId]);
+
+  // Suppress the Monaco onChange that fires when we programmatically update localContent.
+  // Without this, the programmatic update sets isDirty=true and blocks future external syncs.
+  const skipOnChangeRef = useRef(false);
+
   // Keep localContent in sync when the upstream value prop changes (e.g. data loads)
   useEffect(() => {
     if (!isDirty) {
+      skipOnChangeRef.current = true;
       setLocalContent(value);
     }
   }, [value, isDirty]);
@@ -435,6 +445,11 @@ export default function ShExEditor({
         }}
         onChange={(val) => {
           if (val !== undefined) {
+            if (skipOnChangeRef.current) {
+              // Programmatic update from value prop sync — don't mark dirty or notify parent.
+              skipOnChangeRef.current = false;
+              return;
+            }
             setLocalContent(val);
             setIsDirty(true);
             onChange?.(val);

@@ -20,6 +20,7 @@ import {
   useShExMapVersions,
   useSaveShExMapVersion,
   useUpdateShExMap,
+  useCreateShExMap,
   useShExMapPairings,
   useShExMapPairing,
   useCreateShExMapPairing,
@@ -83,9 +84,10 @@ function autoGenerateTurtle(shexContent: string): string {
   return [prefixLines.join('\n'), varComment, ...instances].join('\n') + '\n';
 }
 
-// ─── Turtle localStorage persistence ─────────────────────────────────────────
+// ─── Turtle + Focus IRI localStorage persistence ──────────────────────────────
 
 const TURTLE_STORAGE_KEY = 'shexmap-turtle-data';
+const FOCUS_STORAGE_KEY  = 'shexmap-focus-iri';
 
 function loadTurtle(mapId: string): string {
   try {
@@ -102,6 +104,24 @@ function saveTurtle(mapId: string, content: string) {
     const all: Record<string, string> = raw ? JSON.parse(raw) : {};
     all[mapId] = content;
     localStorage.setItem(TURTLE_STORAGE_KEY, JSON.stringify(all));
+  } catch { /* quota exceeded — ignore */ }
+}
+
+function loadFocus(mapId: string): string {
+  try {
+    const raw = localStorage.getItem(FOCUS_STORAGE_KEY);
+    if (!raw) return '';
+    const all = JSON.parse(raw) as Record<string, string>;
+    return all[mapId] ?? '';
+  } catch { return ''; }
+}
+
+function saveFocus(mapId: string, iri: string) {
+  try {
+    const raw = localStorage.getItem(FOCUS_STORAGE_KEY);
+    const all: Record<string, string> = raw ? JSON.parse(raw) : {};
+    all[mapId] = iri;
+    localStorage.setItem(FOCUS_STORAGE_KEY, JSON.stringify(all));
   } catch { /* quota exceeded — ignore */ }
 }
 
@@ -326,6 +346,42 @@ function MapMetaForm({
   );
 }
 
+/** Compact per-side validation result */
+function SideValidationResult({ result }: { result: ValidationResult }) {
+  const bindingCount = Object.keys(result.bindings).length;
+  return (
+    <div className="space-y-2 pt-1">
+      {result.errors.length > 0 && (
+        <div className="text-red-700 text-xs bg-red-50 border border-red-200 px-3 py-2 rounded space-y-0.5">
+          {result.errors.map((e, i) => <div key={i}>{e}</div>)}
+        </div>
+      )}
+      <div className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium border ${
+        result.valid ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-amber-50 border-amber-200 text-amber-700'
+      }`}>
+        <span>{result.valid ? '✓' : '⚠'}</span>
+        <span>{result.valid
+          ? `${bindingCount} binding${bindingCount !== 1 ? 's' : ''} extracted`
+          : 'No bindings — check ShEx syntax and focus node'}
+        </span>
+      </div>
+      {bindingCount > 0 && (
+        <div className="grid grid-cols-1 gap-y-0.5 font-mono text-xs pl-1">
+          {Object.entries(result.bindings).map(([variable, value]) => (
+            <div key={variable} className="flex items-start gap-1.5">
+              <span className="text-amber-600 shrink-0 max-w-[140px] truncate" title={variable}>
+                {variable.split(/[#>]/).pop() ?? variable}
+              </span>
+              <span className="text-slate-400">=</span>
+              <span className="text-emerald-700 font-semibold break-all">{value}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** Turtle data panel with Monaco editor, auto-generate, and localStorage save */
 function TurtlePanel({
   mapId,
@@ -334,6 +390,10 @@ function TurtlePanel({
   focusNode,
   onChangeTurtle,
   onChangeFocusNode,
+  onValidate,
+  isValidating,
+  validationResult,
+  validationError,
 }: {
   mapId: string;
   shexContent: string;
@@ -341,6 +401,10 @@ function TurtlePanel({
   focusNode: string;
   onChangeTurtle: (v: string) => void;
   onChangeFocusNode: (v: string) => void;
+  onValidate?: () => void;
+  isValidating?: boolean;
+  validationResult?: ValidationResult | null;
+  validationError?: string;
 }) {
   function handleAutoGenerate() {
     const stub = autoGenerateTurtle(shexContent);
@@ -352,6 +416,8 @@ function TurtlePanel({
     onChangeTurtle(v);
     if (mapId) saveTurtle(mapId, v);
   }
+
+  const canValidate = !!shexContent && !!turtleContent && !!focusNode;
 
   return (
     <div className="rounded-none border-t border-slate-700">
@@ -396,11 +462,30 @@ function TurtlePanel({
         <input
           type="text"
           value={focusNode}
-          onChange={(e) => onChangeFocusNode(e.target.value)}
+          onChange={(e) => { onChangeFocusNode(e.target.value); if (mapId) saveFocus(mapId, e.target.value); }}
           placeholder="e.g. tag:BPfhir123 or <http://ex.org/node1> or <...>@START"
           className="flex-1 text-xs font-mono bg-slate-700 text-slate-200 placeholder-slate-500 border border-slate-600 rounded px-2 py-1 focus:outline-none focus:border-violet-400"
         />
+        {onValidate && (
+          <button
+            onClick={onValidate}
+            disabled={isValidating || !canValidate}
+            title={canValidate ? 'Validate this ShExMap against the sample data' : 'Add ShEx, Turtle, and Focus IRI to validate'}
+            className="shrink-0 text-xs px-2.5 py-1 rounded bg-violet-600 hover:bg-violet-500 text-white font-medium disabled:opacity-40 transition-colors"
+          >
+            {isValidating ? 'Validating…' : 'Validate'}
+          </button>
+        )}
       </div>
+      {/* Per-side validation result */}
+      {(validationError || validationResult) && (
+        <div className="bg-white border-t border-slate-200 px-4 py-3">
+          {validationError && (
+            <div className="text-red-700 text-xs bg-red-50 border border-red-200 px-3 py-2 rounded">{validationError}</div>
+          )}
+          {validationResult && <SideValidationResult result={validationResult} />}
+        </div>
+      )}
     </div>
   );
 }
@@ -582,6 +667,97 @@ function ValidationPanel({ result }: { result: ValidationResult }) {
   );
 }
 
+// ─── Inline create-new-map form ───────────────────────────────────────────────
+
+function CreateMapInlineForm({
+  initialContent,
+  onCreated,
+  onCancel,
+}: {
+  initialContent: string;
+  onCreated: (id: string, content: string) => void;
+  onCancel: () => void;
+}) {
+  const createMap = useCreateShExMap();
+  const [title, setTitle]     = useState('');
+  const [version, setVersion] = useState('1.0.0');
+  const [desc, setDesc]       = useState('');
+  const [schema, setSchema]   = useState('');
+  const [tags, setTags]       = useState('');
+  const [err, setErr]         = useState('');
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!title.trim()) { setErr('Title is required.'); return; }
+    setErr('');
+    try {
+      const content = initialContent.trim() || '# New ShEx schema\n';
+      const result = await createMap.mutateAsync({
+        title: title.trim(),
+        description: desc.trim() || undefined,
+        content,
+        sourceSchemaUrl: schema.trim() || undefined,
+        tags: tags.split(',').map((t) => t.trim()).filter(Boolean),
+        version: version.trim() || '1.0.0',
+      });
+      onCreated(result.id, content);
+    } catch (e: unknown) {
+      const ex = e as { response?: { data?: { error?: string } }; message?: string };
+      setErr(ex.response?.data?.error ?? ex.message ?? 'Failed to create map');
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="mt-2 space-y-2 p-3 bg-slate-700 rounded-lg border border-slate-600">
+      <div className="text-xs font-semibold text-violet-300 uppercase tracking-wide mb-1">New ShExMap</div>
+      <div className="flex gap-2">
+        <input
+          autoFocus
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="Title *"
+          className="flex-1 text-sm bg-slate-800 text-slate-200 placeholder-slate-500 border border-slate-600 rounded px-2.5 py-1.5 focus:outline-none focus:border-violet-400"
+        />
+        <input
+          value={version}
+          onChange={(e) => setVersion(e.target.value)}
+          placeholder="1.0.0"
+          className="w-20 text-sm bg-slate-800 text-slate-200 placeholder-slate-500 border border-slate-600 rounded px-2.5 py-1.5 focus:outline-none focus:border-violet-400"
+        />
+      </div>
+      <input
+        value={desc}
+        onChange={(e) => setDesc(e.target.value)}
+        placeholder="Description (optional)"
+        className="w-full text-sm bg-slate-800 text-slate-200 placeholder-slate-500 border border-slate-600 rounded px-2.5 py-1.5 focus:outline-none focus:border-violet-400"
+      />
+      <input
+        value={schema}
+        onChange={(e) => setSchema(e.target.value)}
+        placeholder="Schema URL (optional)"
+        className="w-full text-sm bg-slate-800 text-slate-200 placeholder-slate-500 border border-slate-600 rounded px-2.5 py-1.5 focus:outline-none focus:border-violet-400"
+      />
+      <input
+        value={tags}
+        onChange={(e) => setTags(e.target.value)}
+        placeholder="Tags (comma separated)"
+        className="w-full text-sm bg-slate-800 text-slate-200 placeholder-slate-500 border border-slate-600 rounded px-2.5 py-1.5 focus:outline-none focus:border-violet-400"
+      />
+      {err && <p className="text-xs text-red-400">{err}</p>}
+      <div className="flex gap-2 justify-end">
+        <button type="button" onClick={onCancel}
+          className="text-xs px-3 py-1.5 rounded bg-slate-600 text-slate-300 hover:bg-slate-500 transition-colors">
+          Cancel
+        </button>
+        <button type="submit" disabled={createMap.isPending}
+          className="text-xs px-3 py-1.5 rounded bg-violet-600 text-white hover:bg-violet-500 disabled:opacity-50 transition-colors">
+          {createMap.isPending ? 'Creating…' : 'Create & select'}
+        </button>
+      </div>
+    </form>
+  );
+}
+
 // ─── ShExMap side panel (selector + editor + metadata + turtle) ───────────────
 
 function ShExMapSidePanel({
@@ -613,6 +789,31 @@ function ShExMapSidePanel({
   const updateMeta = useUpdateShExMap(selectedMapId);
   const [showMeta, setShowMeta] = useState(false);
   const [loadedVersionNum, setLoadedVersionNum] = useState<number | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
+
+  // Per-side validation
+  const [sideValidating, setSideValidating] = useState(false);
+  const [sideResult, setSideResult] = useState<ValidationResult | null>(null);
+  const [sideErr, setSideErr] = useState('');
+
+  async function handleSideValidate() {
+    setSideValidating(true);
+    setSideErr('');
+    setSideResult(null);
+    try {
+      const { data } = await axios.post<ValidationResult>('/api/v1/validate', {
+        sourceShEx: shexContent,
+        sourceRdf: turtleContent,
+        sourceNode: focusNode,
+      });
+      setSideResult(data);
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { error?: string } }; message?: string };
+      setSideErr(err.response?.data?.error ?? err.message ?? 'Validation failed');
+    } finally {
+      setSideValidating(false);
+    }
+  }
 
   const map = mapQuery.data;
 
@@ -626,23 +827,16 @@ function ShExMapSidePanel({
     enabled: !!map?.fileName && !map?.content,
   });
 
-  // When map selection changes: restore turtle from localStorage
+  // When map selection changes: restore turtle and focus IRI from localStorage
   const prevMapId = useRef('');
   useEffect(() => {
     if (!selectedMapId || selectedMapId === prevMapId.current) return;
     prevMapId.current = selectedMapId;
-    const saved = loadTurtle(selectedMapId);
-    if (saved) onChangeTurtle(saved);
+    const savedTurtle = loadTurtle(selectedMapId);
+    if (savedTurtle) onChangeTurtle(savedTurtle);
+    const savedFocus = loadFocus(selectedMapId);
+    if (savedFocus) onChangeFocusNode(savedFocus);
   }, [selectedMapId]);
-
-  // When content becomes available (inline or via file fetch): populate editor once per map
-  const prevContentMapId = useRef('');
-  useEffect(() => {
-    const content = fileContent ?? map?.content;
-    if (!content || !selectedMapId || selectedMapId === prevContentMapId.current) return;
-    prevContentMapId.current = selectedMapId;
-    onShexContentChange(content);
-  }, [selectedMapId, fileContent, map?.content]);
 
   const serverVersions = (versionsQuery.data ?? []).map((v: ShExMapVersion) => ({
     versionNumber: v.versionNumber,
@@ -658,6 +852,28 @@ function ShExMapSidePanel({
       setLoadedVersionNum(vn);
     } catch { /* ignore */ }
   }
+
+  // Auto-load content once per map: prefer latest server version, fall back to file/inline.
+  // Wait until the version list has resolved before deciding which source to use.
+  const prevContentMapId = useRef('');
+  useEffect(() => {
+    if (!selectedMapId || selectedMapId === prevContentMapId.current) return;
+    const versions = versionsQuery.data; // undefined = still loading
+    if (versions === undefined) return;  // wait for version list
+
+    if (versions.length > 0) {
+      // Load the latest (highest-numbered) server version automatically
+      const latest = versions[versions.length - 1]!;
+      prevContentMapId.current = selectedMapId;
+      handleLoadServerVersion(latest.versionNumber);
+    } else {
+      // No versions saved — fall back to file content or inline content
+      const content = fileContent ?? map?.content;
+      if (!content) return; // still loading file
+      prevContentMapId.current = selectedMapId;
+      onShexContentChange(content);
+    }
+  }, [selectedMapId, versionsQuery.data, fileContent, map?.content]);
 
   return (
     <div className="flex-1 min-w-0 rounded-xl border border-slate-200 shadow-sm overflow-hidden bg-white">
@@ -683,7 +899,31 @@ function ShExMapSidePanel({
             </>
           )}
         </div>
-        <MapSelector label="" selectedId={selectedMapId} onSelect={(id) => { onSelectMap(id); setLoadedVersionNum(null); }} />
+        <div className="flex items-center gap-2">
+          <div className="flex-1">
+            <MapSelector label="" selectedId={selectedMapId} onSelect={(id) => { onSelectMap(id); setLoadedVersionNum(null); setShowCreate(false); }} />
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowCreate((s) => !s)}
+            title="Create a new ShExMap"
+            className={`shrink-0 text-xs px-2.5 py-1.5 rounded border transition-colors ${showCreate ? 'bg-violet-600 text-white border-violet-500' : 'bg-slate-700 text-violet-300 border-slate-600 hover:bg-slate-600'}`}
+          >
+            + New
+          </button>
+        </div>
+        {showCreate && (
+          <CreateMapInlineForm
+            initialContent={shexContent}
+            onCreated={(id, content) => {
+              onSelectMap(id);
+              onShexContentChange(content);
+              setShowCreate(false);
+              setLoadedVersionNum(null);
+            }}
+            onCancel={() => setShowCreate(false)}
+          />
+        )}
         {showMeta && map && (
           <MapMetaForm
             map={map}
@@ -723,6 +963,10 @@ function ShExMapSidePanel({
         focusNode={focusNode}
         onChangeTurtle={onChangeTurtle}
         onChangeFocusNode={onChangeFocusNode}
+        onValidate={handleSideValidate}
+        isValidating={sideValidating}
+        validationResult={sideResult}
+        validationError={sideErr}
       />
     </div>
   );
@@ -768,13 +1012,12 @@ export default function CreatePairingPage() {
 
   const [saveFlash, setSaveFlash]     = useState(false);
   const [savedPairingId, setSavedPairingId] = useState('');
+  const [commitMsg, setCommitMsg]     = useState('');
 
   // Pairing version history
   const pairingVersionsQuery = useShExMapPairingVersions(editPairingId);
   const savePairingVersion   = useSaveShExMapPairingVersion(editPairingId);
   const [showPairingHistory, setShowPairingHistory] = useState(false);
-  const [pvCommitMsg, setPvCommitMsg] = useState('');
-  const [pvSaveFlash, setPvSaveFlash] = useState(false);
 
   // Populate from existing pairing — only once on initial load, not after saves
   const pairingPopulated = useRef(false);
@@ -791,6 +1034,8 @@ export default function CreatePairingPage() {
     setTgtMapId(p.targetMap.id);
     if (p.sourceMap.content) setSrcShex(p.sourceMap.content);
     if (p.targetMap.content) setTgtShex(p.targetMap.content);
+    if (p.sourceFocusIri) setSrcFocus(p.sourceFocusIri);
+    if (p.targetFocusIri) setTgtFocus(p.targetFocusIri);
   }, [pairingQuery.data]);
 
   // Reset the populated flag when the pairing id changes (user selects a different pairing)
@@ -838,6 +1083,27 @@ export default function CreatePairingPage() {
     }
   }, [activeSourceShex, activeSourceTurtle, activeSourceFocus, activeTargetShex]);
 
+  function downloadPairingJson(pairingId: string) {
+    const bundle = {
+      id: pairingId,
+      title: pairingTitle,
+      description: pairingDesc || undefined,
+      version: pairingVersion,
+      license: pairingLicense || undefined,
+      tags: pairingTags.split(',').map((t) => t.trim()).filter(Boolean),
+      sourceMap: { id: srcMapId, content: srcShex, sampleData: srcTurtle || undefined, focusIri: srcFocus || undefined },
+      targetMap: { id: tgtMapId, content: tgtShex, sampleData: tgtTurtle || undefined, focusIri: tgtFocus || undefined },
+      savedAt: new Date().toISOString(),
+    };
+    const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${pairingTitle.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}-pairing.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   async function handleSavePairing() {
     if (!pairingTitle || !srcMapId || !tgtMapId) return;
     const tags = pairingTags.split(',').map((t) => t.trim()).filter(Boolean);
@@ -846,6 +1112,8 @@ export default function CreatePairingPage() {
       description: pairingDesc || undefined,
       sourceMapId: srcMapId,
       targetMapId: tgtMapId,
+      sourceFocusIri: srcFocus || undefined,
+      targetFocusIri: tgtFocus || undefined,
       tags,
       version: pairingVersion,
       license: pairingLicense || undefined,
@@ -853,6 +1121,8 @@ export default function CreatePairingPage() {
 
     if (editPairingId) {
       await updatePairing.mutateAsync(payload);
+      await savePairingVersion.mutateAsync({ commitMessage: commitMsg.trim() || undefined });
+      setCommitMsg('');
       setSaveFlash(true);
       setTimeout(() => setSaveFlash(false), 2000);
     } else {
@@ -863,7 +1133,7 @@ export default function CreatePairingPage() {
     }
   }
 
-  const isSavingPairing = createPairing.isPending || updatePairing.isPending;
+  const isSavingPairing = createPairing.isPending || updatePairing.isPending || savePairingVersion.isPending;
   const saveError = createPairing.error || updatePairing.error;
 
   return (
@@ -1059,6 +1329,15 @@ export default function CreatePairingPage() {
         )}
 
         <div className="flex items-center gap-3 flex-wrap">
+          {editPairingId && (
+            <input
+              type="text"
+              value={commitMsg}
+              onChange={(e) => setCommitMsg(e.target.value)}
+              placeholder="Change note (optional)"
+              className="text-sm border border-slate-200 bg-slate-50 rounded-lg px-3 py-2 w-52 focus:border-violet-400 focus:outline-none focus:ring-1 focus:ring-violet-300"
+            />
+          )}
           <button
             onClick={handleSavePairing}
             disabled={isSavingPairing || !pairingTitle || !srcMapId || !tgtMapId}
@@ -1069,43 +1348,22 @@ export default function CreatePairingPage() {
           >
             {isSavingPairing ? 'Saving…' : saveFlash ? 'Saved!' : editPairingId ? 'Update Pairing' : 'Save Pairing'}
           </button>
-
-          {/* Pairing version save — only shown when editing an existing pairing */}
-          {editPairingId && (
-            <>
-              <input
-                type="text"
-                value={pvCommitMsg}
-                onChange={(e) => setPvCommitMsg(e.target.value)}
-                placeholder="version note (optional)"
-                className="text-sm border border-slate-200 bg-slate-50 rounded-lg px-3 py-2 w-52 focus:border-violet-400 focus:outline-none focus:ring-1 focus:ring-violet-300"
-              />
-              <button
-                onClick={async () => {
-                  await savePairingVersion.mutateAsync({ commitMessage: pvCommitMsg.trim() || undefined });
-                  setPvCommitMsg('');
-                  setPvSaveFlash(true);
-                  setTimeout(() => setPvSaveFlash(false), 1500);
-                }}
-                disabled={savePairingVersion.isPending}
-                className={`text-sm font-medium px-4 py-2 rounded-lg transition-colors ${
-                  pvSaveFlash ? 'bg-green-600 text-white' :
-                  'bg-slate-700 hover:bg-slate-600 text-slate-200 disabled:opacity-50'
-                }`}
-              >
-                {savePairingVersion.isPending ? 'Saving…' : pvSaveFlash ? 'Saved!' : '↑ Save version'}
-              </button>
-              {(pairingVersionsQuery.data?.length ?? 0) > 0 && (
-                <button
-                  onClick={() => setShowPairingHistory((s) => !s)}
-                  className="text-sm px-3 py-2 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors"
-                >
-                  History ({pairingVersionsQuery.data!.length})
-                </button>
-              )}
-            </>
+          <button
+            onClick={() => downloadPairingJson(editPairingId || savedPairingId)}
+            disabled={!pairingTitle || !srcMapId || !tgtMapId || (!editPairingId && !savedPairingId)}
+            title="Download pairing as JSON"
+            className="font-medium px-4 py-2.5 text-sm rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 transition-colors"
+          >
+            ↓ Download
+          </button>
+          {(pairingVersionsQuery.data?.length ?? 0) > 0 && (
+            <button
+              onClick={() => setShowPairingHistory((s) => !s)}
+              className="text-sm px-3 py-2 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors"
+            >
+              History ({pairingVersionsQuery.data!.length})
+            </button>
           )}
-
           {(!pairingTitle || !srcMapId || !tgtMapId) && (
             <span className="text-xs text-slate-400 italic">Title and both maps are required.</span>
           )}

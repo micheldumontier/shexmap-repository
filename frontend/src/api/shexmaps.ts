@@ -160,6 +160,8 @@ export interface ShExMapPairing {
   description?: string;
   sourceMap: ShExMap;
   targetMap: ShExMap;
+  sourceFocusIri?: string;
+  targetFocusIri?: string;
   tags: string[];
   license?: string;
   version: string;
@@ -210,6 +212,8 @@ export function useCreateShExMapPairing() {
       description?: string;
       sourceMapId: string;
       targetMapId: string;
+      sourceFocusIri?: string;
+      targetFocusIri?: string;
       tags: string[];
       license?: string;
       version: string;
@@ -268,6 +272,8 @@ export function useUpdateShExMapPairing(id: string) {
       license?: string;
       sourceMapId?: string;
       targetMapId?: string;
+      sourceFocusIri?: string;
+      targetFocusIri?: string;
     }) => apiClient.patch(`/pairings/${id}`, data).then((r) => r.data as ShExMapPairing),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['pairing', id] });

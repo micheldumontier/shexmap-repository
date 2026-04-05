@@ -84,6 +84,18 @@ shexmap:targetMap a owl:ObjectProperty ;
     rdfs:domain shexmap:ShExMapPairing ;
     rdfs:range shexmap:ShExMap .
 
+shexmap:sourceFocusIri a owl:DatatypeProperty ;
+    rdfs:label "source focus IRI" ;
+    rdfs:comment "The RDF node IRI used as the focus node when validating the source side of this pairing." ;
+    rdfs:domain shexmap:ShExMapPairing ;
+    rdfs:range xsd:string .
+
+shexmap:targetFocusIri a owl:DatatypeProperty ;
+    rdfs:label "target focus IRI" ;
+    rdfs:comment "The RDF node IRI used as the focus node when validating the target side of this pairing." ;
+    rdfs:domain shexmap:ShExMapPairing ;
+    rdfs:range xsd:string .
+
 shexmap:hasVersion a owl:ObjectProperty ;
     rdfs:label "has version" ;
     rdfs:domain shexmap:ShExMap ;

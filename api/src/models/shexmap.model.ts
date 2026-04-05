@@ -110,6 +110,8 @@ export const ShExMapPairingCreateSchema = z.object({
   description: z.string().max(2000).optional(),
   sourceMapId: z.string().min(1).max(256),
   targetMapId: z.string().min(1).max(256),
+  sourceFocusIri: z.string().max(2048).optional(),
+  targetFocusIri: z.string().max(2048).optional(),
   tags: z.array(z.string().max(50)).max(20).default([]),
   license: z.string().url().optional(),
   version: z.string().regex(/^\d+\.\d+\.\d+$/).default('1.0.0'),
@@ -141,6 +143,8 @@ export interface ShExMapPairing {
   description?: string;
   sourceMap: ShExMap;
   targetMap: ShExMap;
+  sourceFocusIri?: string;
+  targetFocusIri?: string;
   tags: string[];
   license?: string;
   version: string;
