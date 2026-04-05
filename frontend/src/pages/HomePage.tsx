@@ -41,7 +41,7 @@ export default function HomePage() {
               to="/pairings/create"
               className="bg-violet-800 hover:bg-violet-700 text-white font-medium px-6 py-2.5 rounded-lg transition-colors"
             >
-              Map
+              Create
             </Link>
           </div>
         </div>
