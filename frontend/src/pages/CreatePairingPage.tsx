@@ -771,6 +771,7 @@ function ShExMapSidePanel({
   focusNode,
   onChangeTurtle,
   onChangeFocusNode,
+  onContentLoaded,
 }: {
   role: 'Source' | 'Target';
   selectedMapId: string;
@@ -782,6 +783,8 @@ function ShExMapSidePanel({
   focusNode: string;
   onChangeTurtle: (v: string) => void;
   onChangeFocusNode: (v: string) => void;
+  /** Called with the content each time a server version or fallback is loaded — establishes the baseline for dirty detection */
+  onContentLoaded?: (content: string) => void;
 }) {
   const mapQuery = useShExMap(selectedMapId);
   const versionsQuery = useShExMapVersions(selectedMapId);
@@ -849,6 +852,7 @@ function ShExMapSidePanel({
     try {
       const { data } = await axios.get(`/api/v1/shexmaps/${selectedMapId}/versions/${vn}`);
       onShexContentChange(data.content as string);
+      onContentLoaded?.(data.content as string);
       setLoadedVersionNum(vn);
     } catch { /* ignore */ }
   }
@@ -872,6 +876,7 @@ function ShExMapSidePanel({
       if (!content) return; // still loading file
       prevContentMapId.current = selectedMapId;
       onShexContentChange(content);
+      onContentLoaded?.(content);
     }
   }, [selectedMapId, versionsQuery.data, fileContent, map?.content]);
 
@@ -990,12 +995,15 @@ export default function CreatePairingPage() {
   const [srcShex, setSrcShex]             = useState('');
   const [srcTurtle, setSrcTurtle]         = useState('');
   const [srcFocus, setSrcFocus]           = useState('');
+  // Tracks the last content loaded from / saved to the server for dirty detection
+  const srcBaselineRef                    = useRef('');
 
   // Target side
   const [tgtMapId, setTgtMapId]           = useState('');
   const [tgtShex, setTgtShex]             = useState('');
   const [tgtTurtle, setTgtTurtle]         = useState('');
   const [tgtFocus, setTgtFocus]           = useState('');
+  const tgtBaselineRef                    = useRef('');
 
   // Pairing metadata
   const [pairingTitle, setPairingTitle]       = useState('');
@@ -1032,8 +1040,8 @@ export default function CreatePairingPage() {
     setPairingLicense(p.license ?? '');
     setSrcMapId(p.sourceMap.id);
     setTgtMapId(p.targetMap.id);
-    if (p.sourceMap.content) setSrcShex(p.sourceMap.content);
-    if (p.targetMap.content) setTgtShex(p.targetMap.content);
+    if (p.sourceMap.content) { setSrcShex(p.sourceMap.content); srcBaselineRef.current = p.sourceMap.content; }
+    if (p.targetMap.content) { setTgtShex(p.targetMap.content); tgtBaselineRef.current = p.targetMap.content; }
     if (p.sourceFocusIri) setSrcFocus(p.sourceFocusIri);
     if (p.targetFocusIri) setTgtFocus(p.targetFocusIri);
   }, [pairingQuery.data]);
@@ -1106,6 +1114,17 @@ export default function CreatePairingPage() {
 
   async function handleSavePairing() {
     if (!pairingTitle || !srcMapId || !tgtMapId) return;
+
+    // Auto-save a new ShExMap version for each side whose content was edited
+    if (srcShex && srcShex !== srcBaselineRef.current) {
+      await axios.post(`/api/v1/shexmaps/${srcMapId}/versions`, { content: srcShex });
+      srcBaselineRef.current = srcShex;
+    }
+    if (tgtShex && tgtShex !== tgtBaselineRef.current) {
+      await axios.post(`/api/v1/shexmaps/${tgtMapId}/versions`, { content: tgtShex });
+      tgtBaselineRef.current = tgtShex;
+    }
+
     const tags = pairingTags.split(',').map((t) => t.trim()).filter(Boolean);
     const payload = {
       title: pairingTitle,
@@ -1193,6 +1212,7 @@ export default function CreatePairingPage() {
             onSelectMap={setSrcMapId}
             shexContent={srcShex}
             onShexContentChange={setSrcShex}
+            onContentLoaded={(c) => { srcBaselineRef.current = c; }}
             varColorMap={varColorMap}
             turtleContent={srcTurtle}
             focusNode={srcFocus}
@@ -1205,6 +1225,7 @@ export default function CreatePairingPage() {
             onSelectMap={setTgtMapId}
             shexContent={tgtShex}
             onShexContentChange={setTgtShex}
+            onContentLoaded={(c) => { tgtBaselineRef.current = c; }}
             varColorMap={varColorMap}
             turtleContent={tgtTurtle}
             focusNode={tgtFocus}
