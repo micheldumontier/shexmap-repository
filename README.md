@@ -2,6 +2,32 @@
 
 An online platform to store, discover, and explore **ShExMaps** — mappings between RDF shapes defined by [ShEx (Shape Expressions)](http://shex.io).
 
+#### Edit a pair of ShExMap files at the same time.
+
+<img src="assets/pairing_editor.png" width="600">
+
+#### Keep track of the overlap between variables
+
+<img src="assets/mismatched_mapping_variables.png" width="600">
+
+#### Validate sample data against the ShExMap
+
+<img src="assets/shex_editor.png" width="300">
+
+#### Transform RDF data conforming to one schema, into another
+
+<img src="assets/materialize.png" width="300">
+
+#### Save the ShExMap pairing into the repository
+
+<img src="assets/FAIR_pairings.png" width="300">
+
+### Search and browse pairings and ShExMaps
+
+| | |
+|---|---|
+| <img src="assets/browse_pairings.png" width="300"> | <img src="assets/browse_shexmaps.png" width="300"> |
+
 ## Features
 
 - **REST API** (`/api/v1/`) with OpenAPI documentation at `/api/v1/docs`
