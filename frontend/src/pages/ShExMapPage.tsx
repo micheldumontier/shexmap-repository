@@ -430,14 +430,14 @@ export default function ShExMapPage() {
     }
   }, [id, versionsQuery.data, fileContent, map?.content]);
 
-  // Restore turtle and focus IRI from localStorage
+  // Restore turtle from localStorage; fall back to map.sampleTurtleData if nothing stored
   useEffect(() => {
     if (!id) return;
     const t = loadTurtle(id);
-    if (t) setTurtle(t);
+    setTurtle(t || map?.sampleTurtleData || '');
     const f = loadFocus(id);
     if (f) setFocusNode(f);
-  }, [id]);
+  }, [id, map?.sampleTurtleData]);
 
   const handleValidate = useCallback(async () => {
     setValidating(true);
