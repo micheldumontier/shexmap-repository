@@ -32,9 +32,11 @@ An online platform to store, discover, and explore **ShExMaps** — mappings bet
 
 - **REST API** (`/api/v1/`) with OpenAPI documentation at `/api/v1/docs`
 - **SPARQL 1.1 endpoint** (`/sparql`) backed by [QLever](https://github.com/ad-freiburg/qlever)
-- **React web interface** — browse, search, submit, and visualise ShExMaps
+- **React web interface** — browse, search, create, and visualise ShExMaps
+- **ShExMap editor** — create or edit a ShExMap with a Monaco ShEx editor, inline Turtle sample data, focus IRI, and live ShEx/RDF/full validation
 - **Pairing editor** — side-by-side ShEx authoring with per-side validation, shared variable highlighting, and paired validate/materialise
 - **Optional authentication** — OAuth2/OIDC (GitHub, ORCID, Google) + API keys; disabled by default
+- **Docker images** published to GitHub Container Registry on every push to `master`
 
 ## Quick Start
 
@@ -92,6 +94,18 @@ All configuration is via environment variables. Copy `.env.example` to `.env`.
 | `QLEVER_SPARQL_URL` | `http://localhost:7001/sparql` | QLever SPARQL endpoint |
 | `JWT_SECRET` | *(change this)* | Secret for signing JWTs |
 
+## Creating a ShExMap
+
+Navigate to `/maps/new` (or click **+ New Map** in the nav bar).
+
+1. **Fill in metadata** — title (required), version, description, tags, source URL, and schema URL.
+2. **Write ShEx content** — use the Monaco ShEx editor with syntax highlighting.
+3. **Add sample Turtle data** — paste RDF in the Turtle editor below the ShEx editor. This is saved as the map's `sampleTurtleData` and also persisted to browser localStorage.
+4. **Validate** — enter a focus IRI and click **Validate** to run ShEx/RDF/full validation inline before saving.
+5. **Create Map** — click **Create Map** to save. You are redirected to the new map's page, with Turtle data and focus IRI automatically restored.
+
+To edit an existing map, navigate to `/maps/<id>`. The same editor and validation panel are available, plus version history and metadata editing.
+
 ## Creating a Pairing
 
 Navigate to `/pairings/create` (or click **Create Pairing** in the nav).
@@ -139,6 +153,24 @@ Rebuild the QLever index from a previously saved backup:
 
 This stops QLever, rebuilds the index from the backup file, and restarts QLever. **Destructive** — the current index is wiped before restore. The script prompts for confirmation before proceeding.
 
+
+## CI/CD
+
+Two GitHub Actions workflows build and publish Docker images to [GitHub Container Registry (GHCR)](https://ghcr.io) on every push to `master`:
+
+| Workflow | Trigger paths | Image |
+|----------|--------------|-------|
+| `build-api.yml` | `api/**`, `docker/api/Dockerfile` | `ghcr.io/<owner>/<repo>/api` |
+| `build-ui.yml` | `frontend/**`, `docker/nginx/**` | `ghcr.io/<owner>/<repo>/ui` |
+
+Each image is tagged with both `latest` and a `YYYYMMDDHHmmss<sha>` timestamp tag. Images are built for `linux/amd64` and `linux/arm64`.
+
+To pull the latest images:
+
+```bash
+docker pull ghcr.io/<owner>/<repo>/api:latest
+docker pull ghcr.io/<owner>/<repo>/ui:latest
+```
 
 ## License
 
