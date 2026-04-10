@@ -9,38 +9,38 @@
  *  5. Load/save/update a ShExMap Pairing with its metadata
  */
 
-import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
 import Editor, { useMonaco } from '@monaco-editor/react';
+import { useQuery } from '@tanstack/react-query';
+import axios from 'axios';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { apiClient } from '../api/client.js';
+import {
+  useCreateShExMap,
+  useCreateShExMapPairing,
+  useSaveShExMapPairingVersion,
+  useSaveShExMapVersion,
+  useShExMap,
+  useShExMapPairing,
+  useShExMapPairings,
+  useShExMapPairingVersions,
+  useShExMaps,
+  useShExMapVersions,
+  useUpdateShExMap,
+  useUpdateShExMapPairing,
+  type ShExMap,
+  type ShExMapPairingVersion,
+  type ShExMapVersion,
+} from '../api/shexmaps.js';
+import ShExEditor from '../components/editor/ShExEditor.js';
 import { registerShexLanguage } from '../utils/shexLanguage.js';
 import { registerTurtleLanguage, TURTLE_LANGUAGE_ID } from '../utils/turtleLanguage.js';
-import axios from 'axios';
-import {
-  useShExMaps,
-  useShExMap,
-  useShExMapVersions,
-  useSaveShExMapVersion,
-  useUpdateShExMap,
-  useCreateShExMap,
-  useShExMapPairings,
-  useShExMapPairing,
-  useCreateShExMapPairing,
-  useUpdateShExMapPairing,
-  useShExMapPairingVersions,
-  useSaveShExMapPairingVersion,
-  type ShExMap,
-  type ShExMapVersion,
-  type ShExMapPairingVersion,
-} from '../api/shexmaps.js';
-import { apiClient } from '../api/client.js';
-import ShExEditor from '../components/editor/ShExEditor.js';
-import { extractVars, buildVarColorMap } from '../utils/varColors.js';
+import { buildVarColorMap, extractVars } from '../utils/varColors.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface BindingEntry { variable: string; value: string; datatype?: string }
-interface BindingNode  { shape: string; focus: string; bindings: BindingEntry[]; children: BindingNode[] }
+interface BindingNode { shape: string; focus: string; bindings: BindingEntry[]; children: BindingNode[] }
 interface ValidationResult {
   valid: boolean;
   bindingTree: BindingNode[];
@@ -89,7 +89,7 @@ function autoGenerateTurtle(shexContent: string): string {
 // ─── Turtle + Focus IRI localStorage persistence ──────────────────────────────
 
 const TURTLE_STORAGE_KEY = 'shexmap-turtle-data';
-const FOCUS_STORAGE_KEY  = 'shexmap-focus-iri';
+const FOCUS_STORAGE_KEY = 'shexmap-focus-iri';
 
 function loadTurtle(mapId: string): string {
   try {
@@ -130,18 +130,18 @@ function saveFocus(mapId: string, iri: string) {
 // ─── License list ─────────────────────────────────────────────────────────────
 
 const KNOWN_LICENSES = [
-  { label: 'CC0 1.0 — Public Domain Dedication',            url: 'https://creativecommons.org/publicdomain/zero/1.0/' },
-  { label: 'CC BY 4.0 — Attribution',                       url: 'https://creativecommons.org/licenses/by/4.0/' },
-  { label: 'CC BY-SA 4.0 — Attribution-ShareAlike',         url: 'https://creativecommons.org/licenses/by-sa/4.0/' },
-  { label: 'CC BY-NC 4.0 — Attribution-NonCommercial',      url: 'https://creativecommons.org/licenses/by-nc/4.0/' },
+  { label: 'CC0 1.0 — Public Domain Dedication', url: 'https://creativecommons.org/publicdomain/zero/1.0/' },
+  { label: 'CC BY 4.0 — Attribution', url: 'https://creativecommons.org/licenses/by/4.0/' },
+  { label: 'CC BY-SA 4.0 — Attribution-ShareAlike', url: 'https://creativecommons.org/licenses/by-sa/4.0/' },
+  { label: 'CC BY-NC 4.0 — Attribution-NonCommercial', url: 'https://creativecommons.org/licenses/by-nc/4.0/' },
   { label: 'CC BY-NC-SA 4.0 — Attribution-NonCommercial-ShareAlike', url: 'https://creativecommons.org/licenses/by-nc-sa/4.0/' },
-  { label: 'CC BY-ND 4.0 — Attribution-NoDerivatives',      url: 'https://creativecommons.org/licenses/by-nd/4.0/' },
-  { label: 'ODbL 1.0 — Open Database License',              url: 'https://opendatacommons.org/licenses/odbl/1-0/' },
-  { label: 'ODC-By 1.0 — Open Data Commons Attribution',    url: 'https://opendatacommons.org/licenses/by/1-0/' },
+  { label: 'CC BY-ND 4.0 — Attribution-NoDerivatives', url: 'https://creativecommons.org/licenses/by-nd/4.0/' },
+  { label: 'ODbL 1.0 — Open Database License', url: 'https://opendatacommons.org/licenses/odbl/1-0/' },
+  { label: 'ODC-By 1.0 — Open Data Commons Attribution', url: 'https://opendatacommons.org/licenses/by/1-0/' },
   { label: 'PDDL 1.0 — Public Domain Dedication & License', url: 'https://opendatacommons.org/licenses/pddl/1-0/' },
-  { label: 'MIT License',                                   url: 'https://opensource.org/licenses/MIT' },
-  { label: 'Apache 2.0',                                    url: 'https://www.apache.org/licenses/LICENSE-2.0' },
-  { label: 'GPL 3.0',                                       url: 'https://www.gnu.org/licenses/gpl-3.0.html' },
+  { label: 'MIT License', url: 'https://opensource.org/licenses/MIT' },
+  { label: 'Apache 2.0', url: 'https://www.apache.org/licenses/LICENSE-2.0' },
+  { label: 'GPL 3.0', url: 'https://www.gnu.org/licenses/gpl-3.0.html' },
 ];
 
 function LicensePicker({
@@ -157,9 +157,9 @@ function LicensePicker({
 
   const filtered = q.trim()
     ? KNOWN_LICENSES.filter((l) =>
-        l.label.toLowerCase().includes(q.toLowerCase()) ||
-        l.url.toLowerCase().includes(q.toLowerCase()),
-      )
+      l.label.toLowerCase().includes(q.toLowerCase()) ||
+      l.url.toLowerCase().includes(q.toLowerCase()),
+    )
     : KNOWN_LICENSES;
 
   const selectedLabel = KNOWN_LICENSES.find((l) => l.url === value)?.label;
@@ -324,12 +324,12 @@ function MapMetaForm({
   onSave: (data: { title: string; description: string; tags: string[]; version: string; schemaUrl: string }) => void;
   isSaving: boolean;
 }) {
-  const [title, setTitle]       = useState(map.title);
-  const [desc, setDesc]         = useState(map.description ?? '');
-  const [tags, setTags]         = useState(map.tags.join(', '));
-  const [version, setVersion]   = useState(map.version);
-  const [schema, setSchema]     = useState(map.schemaUrl ?? '');
-  const [flash, setFlash]       = useState(false);
+  const [title, setTitle] = useState(map.title);
+  const [desc, setDesc] = useState(map.description ?? '');
+  const [tags, setTags] = useState(map.tags.join(', '));
+  const [version, setVersion] = useState(map.version);
+  const [schema, setSchema] = useState(map.schemaUrl ?? '');
+  const [flash, setFlash] = useState(false);
 
   useEffect(() => {
     setTitle(map.title);
@@ -386,9 +386,8 @@ function SideValidationResult({ result }: { result: ValidationResult }) {
           {result.errors.map((e, i) => <div key={i}>{e}</div>)}
         </div>
       )}
-      <div className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium border ${
-        result.valid ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-amber-50 border-amber-200 text-amber-700'
-      }`}>
+      <div className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium border ${result.valid ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-amber-50 border-amber-200 text-amber-700'
+        }`}>
         <span>{result.valid ? '✓' : '⚠'}</span>
         <span>{result.valid
           ? `${bindingCount} binding${bindingCount !== 1 ? 's' : ''} extracted`
@@ -655,9 +654,8 @@ function ValidationPanel({ result }: { result: ValidationResult }) {
           {result.errors.map((e, i) => <div key={i}>{e}</div>)}
         </div>
       )}
-      <div className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm font-medium border ${
-        result.valid ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-amber-50 border-amber-200 text-amber-700'
-      }`}>
+      <div className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm font-medium border ${result.valid ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-amber-50 border-amber-200 text-amber-700'
+        }`}>
         <span>{result.valid ? '✓' : '⚠'}</span>
         <span>{result.valid
           ? `${bindingCount} binding${bindingCount !== 1 ? 's' : ''} extracted`
@@ -716,12 +714,12 @@ function CreateMapInlineForm({
   onCancel: () => void;
 }) {
   const createMap = useCreateShExMap();
-  const [title, setTitle]     = useState('');
+  const [title, setTitle] = useState('');
   const [version, setVersion] = useState('1.0.0');
-  const [desc, setDesc]       = useState('');
-  const [schema, setSchema]   = useState('');
-  const [tags, setTags]       = useState('');
-  const [err, setErr]         = useState('');
+  const [desc, setDesc] = useState('');
+  const [schema, setSchema] = useState('');
+  const [tags, setTags] = useState('');
+  const [err, setErr] = useState('');
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -733,7 +731,7 @@ function CreateMapInlineForm({
         title: title.trim(),
         description: desc.trim() || undefined,
         content,
-        sourceSchemaUrl: schema.trim() || undefined,
+        schemaUrl: schema.trim() || undefined,
         tags: tags.split(',').map((t) => t.trim()).filter(Boolean),
         version: version.trim() || '1.0.0',
       });
@@ -1038,40 +1036,40 @@ export default function CreatePairingPage() {
   const updatePairing = useUpdateShExMapPairing(editPairingId);
 
   // Source side
-  const [srcMapId, setSrcMapId]           = useState('');
-  const [srcShex, setSrcShex]             = useState('');
-  const [srcTurtle, setSrcTurtle]         = useState('');
-  const [srcFocus, setSrcFocus]           = useState('');
+  const [srcMapId, setSrcMapId] = useState('');
+  const [srcShex, setSrcShex] = useState('');
+  const [srcTurtle, setSrcTurtle] = useState('');
+  const [srcFocus, setSrcFocus] = useState('');
   // Tracks the last content loaded from / saved to the server for dirty detection
-  const srcBaselineRef                    = useRef('');
+  const srcBaselineRef = useRef('');
 
   // Target side
-  const [tgtMapId, setTgtMapId]           = useState('');
-  const [tgtShex, setTgtShex]             = useState('');
-  const [tgtTurtle, setTgtTurtle]         = useState('');
-  const [tgtFocus, setTgtFocus]           = useState('');
-  const tgtBaselineRef                    = useRef('');
+  const [tgtMapId, setTgtMapId] = useState('');
+  const [tgtShex, setTgtShex] = useState('');
+  const [tgtTurtle, setTgtTurtle] = useState('');
+  const [tgtFocus, setTgtFocus] = useState('');
+  const tgtBaselineRef = useRef('');
 
   // Pairing metadata
-  const [pairingTitle, setPairingTitle]       = useState('');
-  const [pairingDesc, setPairingDesc]         = useState('');
-  const [pairingTags, setPairingTags]         = useState('');
-  const [pairingVersion, setPairingVersion]   = useState('1.0.0');
-  const [pairingLicense, setPairingLicense]   = useState('');
+  const [pairingTitle, setPairingTitle] = useState('');
+  const [pairingDesc, setPairingDesc] = useState('');
+  const [pairingTags, setPairingTags] = useState('');
+  const [pairingVersion, setPairingVersion] = useState('1.0.0');
+  const [pairingLicense, setPairingLicense] = useState('');
 
   // Validation
-  const [direction, setDirection]     = useState<'src-to-tgt' | 'tgt-to-src'>('src-to-tgt');
-  const [validating, setValidating]   = useState(false);
+  const [direction, setDirection] = useState<'src-to-tgt' | 'tgt-to-src'>('src-to-tgt');
+  const [validating, setValidating] = useState(false);
   const [validationErr, setValidationErr] = useState('');
-  const [result, setResult]           = useState<ValidationResult | null>(null);
+  const [result, setResult] = useState<ValidationResult | null>(null);
 
-  const [saveFlash, setSaveFlash]     = useState(false);
+  const [saveFlash, setSaveFlash] = useState(false);
   const [savedPairingId, setSavedPairingId] = useState('');
-  const [commitMsg, setCommitMsg]     = useState('');
+  const [commitMsg, setCommitMsg] = useState('');
 
   // Pairing version history
   const pairingVersionsQuery = useShExMapPairingVersions(editPairingId);
-  const savePairingVersion   = useSaveShExMapPairingVersion(editPairingId);
+  const savePairingVersion = useSaveShExMapPairingVersion(editPairingId);
   const [showPairingHistory, setShowPairingHistory] = useState(false);
 
   // Populate from existing pairing — only once on initial load, not after saves
@@ -1107,16 +1105,16 @@ export default function CreatePairingPage() {
   }, [srcShex, tgtShex]);
 
   // Determine which ShEx/Turtle to use for validation depending on direction
-  const activeSourceShex   = direction === 'src-to-tgt' ? srcShex : tgtShex;
+  const activeSourceShex = direction === 'src-to-tgt' ? srcShex : tgtShex;
   const activeSourceTurtle = direction === 'src-to-tgt' ? srcTurtle : tgtTurtle;
-  const activeSourceFocus  = direction === 'src-to-tgt' ? srcFocus : tgtFocus;
-  const activeTargetShex   = direction === 'src-to-tgt' ? tgtShex : srcShex;
+  const activeSourceFocus = direction === 'src-to-tgt' ? srcFocus : tgtFocus;
+  const activeTargetShex = direction === 'src-to-tgt' ? tgtShex : srcShex;
 
   const handleValidate = useCallback(async (materialize: boolean) => {
     const missing: string[] = [];
-    if (!activeSourceShex)   missing.push(`${direction === 'src-to-tgt' ? 'source' : 'target'} ShEx content`);
+    if (!activeSourceShex) missing.push(`${direction === 'src-to-tgt' ? 'source' : 'target'} ShEx content`);
     if (!activeSourceTurtle) missing.push(`${direction === 'src-to-tgt' ? 'source' : 'target'} Turtle data`);
-    if (!activeSourceFocus)  missing.push('focus IRI');
+    if (!activeSourceFocus) missing.push('focus IRI');
     if (missing.length > 0) {
       setValidationErr(`Missing: ${missing.join(', ')}.`);
       return;
@@ -1414,10 +1412,9 @@ export default function CreatePairingPage() {
           <button
             onClick={handleSavePairing}
             disabled={isSavingPairing || !pairingTitle || !srcMapId || !tgtMapId}
-            className={`font-medium px-6 py-2.5 text-sm rounded-lg transition-colors ${
-              saveFlash ? 'bg-green-600 text-white' :
+            className={`font-medium px-6 py-2.5 text-sm rounded-lg transition-colors ${saveFlash ? 'bg-green-600 text-white' :
               'bg-violet-600 hover:bg-violet-500 text-white disabled:opacity-40'
-            }`}
+              }`}
           >
             {isSavingPairing ? 'Saving…' : saveFlash ? 'Saved!' : editPairingId ? 'Update Pairing' : 'Save Pairing'}
           </button>
