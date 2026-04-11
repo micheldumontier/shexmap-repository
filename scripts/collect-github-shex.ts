@@ -27,6 +27,10 @@
  *   --sparql-url URL      QLever SPARQL endpoint — used to skip files whose
  *                         dct:source IRI is already in the triplestore
  *                         (also read from QLEVER_SPARQL_URL env var)
+ *   --output-dir DIR      Directory to save gzip-compressed .shex files.
+ *                         Files are stored as {DIR}/{owner}/{repo}/{path}.gz
+ *                         Default: sparql/files/github (relative to repo root).
+ *                         Pass an empty string ("") to disable file saving.
  *
  * Deduplication strategy (applied in order):
  *   1. State file: if the blob SHA for this file is unchanged → skip
@@ -44,9 +48,13 @@
  *   ~10 req/min unauthenticated / ~30 req/min authenticated.
  */
 
-import { readFileSync, writeFileSync, existsSync } from 'fs';
-import { resolve, dirname } from 'path';
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
+import { resolve, dirname, join } from 'path';
 import { fileURLToPath } from 'url';
+import { gzip } from 'zlib';
+import { promisify } from 'util';
+
+const gzipAsync = promisify(gzip);
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '..');
@@ -78,6 +86,9 @@ const FORCE        = flag('force');
 const FETCH_TOPICS = flag('fetch-topics');
 const SPARQL_URL   = opt('sparql-url',    'QLEVER_SPARQL_URL');
 const STATE_FILE   = resolve(opt('state-file', undefined, resolve(REPO_ROOT, '.harvest-state.json'))!);
+// Empty string disables file saving; undefined uses the default path
+const OUTPUT_DIR_RAW = opt('output-dir', undefined, join(REPO_ROOT, 'sparql', 'files', 'github'));
+const OUTPUT_DIR     = OUTPUT_DIR_RAW === '' ? null : resolve(OUTPUT_DIR_RAW!);
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -303,6 +314,34 @@ function extractDescription(content: string): string | undefined {
   return desc.length > 0 ? desc.slice(0, 2000) : undefined;
 }
 
+// ─── Compressed file storage ─────────────────────────────────────────────────
+
+/**
+ * Save a .shex file as gzip-compressed to:
+ *   {OUTPUT_DIR}/{owner}/{repo}/{path/to/file.shex}.gz
+ *
+ * Mirrors the GitHub repo tree so provenance is preserved on disk.
+ * Returns the absolute path written, or null if OUTPUT_DIR is disabled.
+ */
+async function saveCompressed(
+  fullName: string,
+  filePath: string,
+  content: string,
+): Promise<string | null> {
+  if (!OUTPUT_DIR) return null;
+
+  // Build destination path, e.g. sparql/files/github/owner/repo/path/to/file.shex.gz
+  const destPath = join(OUTPUT_DIR, fullName, `${filePath}.gz`);
+  const destDir  = dirname(destPath);
+
+  mkdirSync(destDir, { recursive: true });
+
+  const compressed = await gzipAsync(Buffer.from(content, 'utf-8'));
+  writeFileSync(destPath, compressed);
+
+  return destPath;
+}
+
 // ─── SPARQL-based dedup ───────────────────────────────────────────────────────
 
 async function isSourceUrlInTriplestore(sourceUrl: string): Promise<boolean> {
@@ -371,6 +410,7 @@ async function main(): Promise<void> {
   console.log(`  API URL     : ${API_URL}`);
   console.log(`  GH query    : "${GH_QUERY}"`);
   console.log(`  State file  : ${STATE_FILE}`);
+  console.log(`  Output dir  : ${OUTPUT_DIR ?? '(disabled)'}`);
   console.log(`  SPARQL dedup: ${SPARQL_URL ?? '(disabled)'}`);
   console.log(`  Fetch topics: ${FETCH_TOPICS}`);
   console.log(`  Limit       : ${LIMIT || 'unlimited'}`);
@@ -475,7 +515,17 @@ async function main(): Promise<void> {
         version: '1.0.0',
       };
 
-      // ── 6. Dry run output ───────────────────────────────────────────────
+      // ── 6. Save compressed file to disk ────────────────────────────────
+      let savedPath: string | null = null;
+      if (!DRY_RUN) {
+        try {
+          savedPath = await saveCompressed(item.repository.full_name, item.path, content);
+        } catch (err) {
+          console.warn(`  [warn] Could not write compressed file for ${stateKey}: ${err}`);
+        }
+      }
+
+      // ── 7. Dry run output ───────────────────────────────────────────────
       if (DRY_RUN) {
         const action = existing?.mapId ? 'would-update' : 'would-import';
         console.log(`  [${action}] ${stateKey}`);
@@ -483,11 +533,15 @@ async function main(): Promise<void> {
         console.log(`    source     : ${rawUrl}`);
         console.log(`    tags       : ${tags.join(', ') || '(none)'}`);
         console.log(`    size       : ${content.length.toLocaleString()} chars`);
+        if (OUTPUT_DIR) {
+          const dest = join(OUTPUT_DIR, item.repository.full_name, `${item.path}.gz`);
+          console.log(`    would-save : ${dest}`);
+        }
         countImported++;
         continue;
       }
 
-      // ── 7. Import or update ─────────────────────────────────────────────
+      // ── 8. Import or update ─────────────────────────────────────────────
       try {
         await sleep(DELAY_MS);
 
@@ -498,14 +552,14 @@ async function main(): Promise<void> {
             content,
             `Harvested update from GitHub (blob ${item.sha.slice(0, 7)})`,
           );
-          console.log(`  [updated] ${stateKey}  id=${existing.mapId}`);
+          console.log(`  [updated] ${stateKey}  id=${existing.mapId}${savedPath ? `  → ${savedPath}` : ''}`);
           state.harvested[stateKey] = { ...existing, sha: item.sha, importedAt: new Date().toISOString() };
           countUpdated++;
         } else {
           // New file → create ShExMap
           const result = await importShExMap(payload);
           if (result) {
-            console.log(`  [imported] ${stateKey}  id=${result.id}`);
+            console.log(`  [imported] ${stateKey}  id=${result.id}${savedPath ? `  → ${savedPath}` : ''}`);
             state.harvested[stateKey] = {
               sha: item.sha,
               mapId: result.id,
